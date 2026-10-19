@@ -1,3 +1,8 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>ระบบเตือนนัดทันตกรรม</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -104,8 +109,17 @@ code.block{display:block;white-space:pre;overflow-x:auto;background:var(--surfac
 .outc button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);font-weight:600}
 .cutrow{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:10px}
 .tag{font-size:.72rem;font-weight:600;padding:2px 7px;border-radius:3px;background:var(--accent-soft);color:var(--accent);margin-left:6px;vertical-align:middle}
+.chats{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-top:14px}
+.chat{background:var(--surface2);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.chat h3{margin:0;font-size:.9rem}.chat .why{font-size:.78rem;color:var(--muted);margin:0}
+.bub{background:var(--surface);border:1px solid var(--line);border-radius:4px 14px 14px 14px;padding:10px 12px;white-space:pre-line;font-size:.9rem;overflow-wrap:anywhere}
+.qr{display:flex;flex-wrap:wrap;gap:6px}.qr span{border:1px solid var(--accent);color:var(--accent);background:var(--accent-soft);border-radius:14px;padding:3px 12px;font-size:.82rem;font-weight:500}
+.skip{font-size:.85rem;color:var(--muted);padding:10px 0}
 </style>
 
+<style>body{margin:0}[hidden]{display:none!important}img{max-width:100%}</style>
+</head>
+<body>
 <div class="wrap">
 <header>
   <div>
@@ -123,6 +137,15 @@ code.block{display:block;white-space:pre;overflow-x:auto;background:var(--surfac
 <section id="v-q" role="tabpanel" style="display:flex;flex-direction:column;gap:18px">
   <div class="sum" id="sum"></div>
   <div class="main"><div id="queue"></div><aside class="panel" id="panel" aria-live="polite"></aside></div>
+</section>
+
+<section id="v-l" role="tabpanel" hidden>
+  <div class="card">
+    <h2>ตัวอย่างข้อความแจ้งเตือนทาง LINE <span class="tag">ยังไม่ส่งจริง</span></h2>
+    <p class="note">ใช้นัดสมมติเท่านั้น ข้อความถึงผู้ป่วยไม่แสดงระดับความเสี่ยง ผู้รับแต่ละกลุ่มได้ข้อความต่างกันตามระดับของนัดที่เลือก</p>
+    <div class="form" style="grid-template-columns:minmax(0,420px)"><label>เลือกนัดตัวอย่าง<select id="l-sel"></select></label></div>
+    <div class="chats" id="l-body"></div>
+  </div>
 </section>
 
 <section id="v-i" role="tabpanel" hidden>
@@ -223,13 +246,14 @@ const fmtDay = s => new Date(s+'T00:00:00').toLocaleDateString('th-TH',{weekday:
 const isDone = a => ACTIONS[lvl(a)].every((_,i)=>S.done[key(a)+i]);
 
 // ---- แท็บตามบทบาท ----
-const TABS = {staff:[['q','คิวนัดหมาย']], admin:[['q','คิวนัดหมาย'],['i','นำเข้านัดหมาย'],['m','จุดตัดและโมเดล']]};
+const TABS = {staff:[['q','คิวนัดหมาย'],['l','ข้อความ LINE']], admin:[['q','คิวนัดหมาย'],['l','ข้อความ LINE'],['i','นำเข้านัดหมาย'],['m','จุดตัดและโมเดล']]};
 function renderTabs(){
   if(!TABS[role].some(t=>t[0]===tab)) tab='q';
   $('#tabs').innerHTML = TABS[role].map(([k,l])=>`<button role="tab" data-t="${k}" aria-selected="${tab===k}">${l}</button>`).join('');
   document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>{tab=b.dataset.t;renderTabs();});
-  ['q','i','m'].forEach(k=>{$('#v-'+k).hidden = tab!==k;});
+  ['q','l','i','m'].forEach(k=>{$('#v-'+k).hidden = tab!==k;});
   if(tab==='m') renderAdmin();
+  if(tab==='l') renderLine();
   $('#r-staff').setAttribute('aria-pressed',role==='staff'); $('#r-admin').setAttribute('aria-pressed',role==='admin');
 }
 $('#r-staff').onclick=()=>{role='staff';renderTabs();renderPanel();};
@@ -336,7 +360,28 @@ function setCut(){const h=Math.round(Number($('#cut-high').value)),l=Math.round(
 $('#cut-high').onchange=setCut; $('#cut-low').onchange=setCut;
 $('#cut-reset').onclick=()=>{S.cut={...DEF_CUT};save();refresh();};
 
-function refresh(){renderSum();renderQueue();renderPanel();if(tab==='m')renderAdmin();}
+function renderLine(){
+  const sl=$('#l-sel'), list=all().filter(a=>true).sort((a,b)=>a.date.localeCompare(b.date)||a.id.localeCompare(b.id));
+  const cur=sl.value; sl.innerHTML=list.map(a=>`<option value="${esc(key(a))}">${esc(a.id)} · ${a.date} · ${LV[lvl(a)]}</option>`).join('');
+  sl.value = list.some(a=>key(a)===cur)?cur:(sel&&list.some(a=>key(a)===sel)?sel:(list[0]?key(list[0]):''));
+  sl.onchange=renderLine;
+  const a=list.find(x=>key(x)===sl.value); if(!a){$('#l-body').innerHTML='';return;}
+  const L=lvl(a), slot=a.period==='morning'?'ช่วงเช้า':'ช่วงบ่าย', day=fmtDay(a.date);
+  const day_=all().filter(x=>x.date===a.date), c={high:0,medium:0,low:0}; day_.forEach(x=>c[lvl(x)]++);
+  const hi=day_.filter(x=>lvl(x)==='high').slice(0,5);
+  const box=(t,why,body)=>`<div class="chat"><h3>${t}</h3><p class="why">${why}</p>${body}</div>`;
+  const msg=(txt,btns)=>`<div class="bub">${esc(txt)}</div><div class="qr">${btns.map(b=>`<span>${b}</span>`).join('')}</div>`;
+  const pat=box('ผู้ป่วย','ส่งทุกระดับ 1–3 วันก่อนนัด',msg(`รพ.สต.บ้านเตาถ่าน แจ้งนัดทันตกรรม\n${day}\n${slot} · ${a.proc}\nกรุณามาตามนัด หากไม่สะดวกกดขอเลื่อนนัดได้`,['ยืนยันว่าจะมา','ขอเลื่อนนัด']));
+  const cg = L==='high' ? box('อสม. / ผู้ดูแล','เสี่ยงสูง ส่งก่อนนัด 2–3 วัน',msg(`ขอความร่วมมือเตือนและช่วยพาผู้ป่วยรหัส ${a.id} มารับบริการทันตกรรม\n${day} ${slot}\nหากเดินทางลำบาก แจ้ง รพ.สต. เพื่อประสานรถรับส่ง`,['รับทราบ','ต้องการรถรับส่ง']))
+    : L==='medium' ? box('อสม. / ผู้ดูแล','เสี่ยงปานกลาง ส่งก่อนนัด 2–3 วัน',msg(`ขอให้ช่วยยืนยันการเดินทางของผู้ป่วยรหัส ${a.id}\nนัดทันตกรรม ${day} ${slot}`,['ยืนยันแล้ว','ไม่สะดวก']))
+    : box('อสม. / ผู้ดูแล','เสี่ยงต่ำ ไม่ส่งข้อความถึงกลุ่มนี้','<div class="skip">นัดนี้ได้รับเฉพาะข้อความเตือนอัตโนมัติถึงผู้ป่วย</div>');
+  const st=box('เจ้าหน้าที่','สรุปเช้าวันก่อนนัด',msg(`สรุปนัดทันตกรรม ${day}\nทั้งหมด ${day_.length} นัด · สูง ${c.high} · กลาง ${c.medium} · ต่ำ ${c.low}\n`+(hi.length?'ต้องตามเป็นพิเศษ:\n'+hi.map(x=>`• ${x.id} ${x.proc} (${x.period==='morning'?'เช้า':'บ่าย'})`).join('\n'):'ไม่มีนัดเสี่ยงสูง'),['เปิดคิวนัด']));
+  $('#l-body').innerHTML=pat+cg+st;
+}
+function refresh(){renderSum();renderQueue();renderPanel();if(tab==='m')renderAdmin();if(tab==='l')renderLine();}
 renderTabs(); refresh();
 const first=all().find(a=>lvl(a)==='high'); if(first){sel=key(first);refresh();}
 </script>
+
+</body>
+</html>

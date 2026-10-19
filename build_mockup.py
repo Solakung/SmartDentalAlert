@@ -20,4 +20,10 @@ rows = [dict(id=f"P{int(r.patient_id):04d}", date=r.appt_date.strftime("%Y-%m-%d
 data = dict(appts=rows, cut=res["risk_cutoffs"], metrics=res["models"]["RF + SMOTE (ตามโครงร่าง)"], risk=res["risk_table"], n=res["n"],
             imp=[dict(f=d["feature"], g=d["gini"], pm=d["permutation_auc_drop"], grp=d["andersen_group"]) for d in res["importance"]])
 html = open("mockup_template.html").read().replace("__DATA__", json.dumps(data, ensure_ascii=False))
-open("docs/index.html", "w").write(html); print(len(rows), "appointments, week", w)
+# docs/index.html เปิดตรงๆ (GitHub Pages) จึงต้องมี doctype/charset/viewport/กฎ [hidden] ครบ
+i = html.index('<div class="wrap">')
+page = ('<!doctype html>\n<html lang="th">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">\n'
+        + html[:i] + '<style>body{margin:0}[hidden]{display:none!important}img{max-width:100%}</style>\n</head>\n<body>\n' + html[i:] + '\n</body>\n</html>\n')
+open("docs/index.html", "w").write(page)
+open("mockup_artifact.html", "w").write(html)   # แบบไม่มี skeleton สำหรับ Claude artifact
+print(len(rows), "appointments, week", w)

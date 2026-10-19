@@ -168,3 +168,4 @@ data_real/
 *.xls
 model.joblib
 run_log.txt
+mockup_artifact.html
