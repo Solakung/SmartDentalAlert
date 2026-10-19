@@ -1,0 +1,171 @@
+{
+ "n": {
+  "train": 2623,
+  "val": 701,
+  "test": 1298
+ },
+ "models": {
+  "RF + SMOTE (ตามโครงร่าง)": {
+   "accuracy": 0.7349768875192604,
+   "precision": 0.3029411764705882,
+   "recall": 0.49047619047619045,
+   "f1": 0.37454545454545457,
+   "auc": 0.6730501575630252,
+   "pr_auc": 0.2994402830024343,
+   "brier": 0.13397323480758422,
+   "tn": 851,
+   "fp": 237,
+   "fn": 107,
+   "tp": 103,
+   "threshold": 0.29657526962156566
+  },
+  "RF + class_weight": {
+   "accuracy": 0.8050847457627118,
+   "precision": 0.40444444444444444,
+   "recall": 0.43333333333333335,
+   "f1": 0.41839080459770117,
+   "auc": 0.6929556197478991,
+   "pr_auc": 0.3602862378684794,
+   "brier": 0.1642409608271042,
+   "tn": 954,
+   "fp": 134,
+   "fn": 119,
+   "tp": 91,
+   "threshold": 0.5
+  },
+  "RF (ไม่ปรับสมดุล)": {
+   "accuracy": 0.8428351309707242,
+   "precision": 0.6875,
+   "recall": 0.05238095238095238,
+   "f1": 0.09734513274336283,
+   "auc": 0.6940104166666666,
+   "pr_auc": 0.3650461514444254,
+   "brier": 0.12278005528937702,
+   "tn": 1083,
+   "fp": 5,
+   "fn": 199,
+   "tp": 11,
+   "threshold": 0.5
+  },
+  "Logistic regression (baseline)": {
+   "accuracy": 0.662557781201849,
+   "precision": 0.272,
+   "recall": 0.6476190476190476,
+   "f1": 0.38309859154929576,
+   "auc": 0.7173647584033612,
+   "pr_auc": 0.40424311276869734,
+   "brier": 0.2397306429417255,
+   "tn": 724,
+   "fp": 364,
+   "fn": 74,
+   "tp": 136,
+   "threshold": 0.5
+  },
+  "RF + SMOTE @0.5": {
+   "accuracy": 0.8189522342064715,
+   "precision": 0.3563218390804598,
+   "recall": 0.14761904761904762,
+   "f1": 0.20875420875420875,
+   "auc": 0.6730501575630252,
+   "pr_auc": 0.2994402830024343,
+   "brier": 0.13397323480758422,
+   "tn": 1032,
+   "fp": 56,
+   "fn": 179,
+   "tp": 31,
+   "threshold": 0.5
+  }
+ },
+ "risk_cutoffs": {
+  "low_below": 0.08003510187221548,
+  "high_from": 0.29657526962156566
+ },
+ "importance": [
+  {
+   "feature": "procedure",
+   "gini": 0.20848753225736694,
+   "permutation_auc_drop": -0.007825338468720761,
+   "andersen_group": "Need"
+  },
+  {
+   "feature": "marital",
+   "gini": 0.13788094902794246,
+   "permutation_auc_drop": 0.0160189075630252,
+   "andersen_group": "Predisposing"
+  },
+  {
+   "feature": "sex",
+   "gini": 0.1298092971000142,
+   "permutation_auc_drop": 0.005545634920634927,
+   "andersen_group": "Predisposing"
+  },
+  {
+   "feature": "prior_noshows",
+   "gini": 0.10692324593889518,
+   "permutation_auc_drop": 0.005251371381886072,
+   "andersen_group": "Predisposing"
+  },
+  {
+   "feature": "prior_noshow_rate",
+   "gini": 0.09066505344678041,
+   "permutation_auc_drop": 0.06497826213818864,
+   "andersen_group": "Predisposing"
+  },
+  {
+   "feature": "period",
+   "gini": 0.08949876929215099,
+   "permutation_auc_drop": 0.0013130252100840216,
+   "andersen_group": "Enabling"
+  },
+  {
+   "feature": "chronic_disease",
+   "gini": 0.06929065885650709,
+   "permutation_auc_drop": -0.0014683998599439732,
+   "andersen_group": "Need"
+  },
+  {
+   "feature": "scheme",
+   "gini": 0.05368538438743801,
+   "permutation_auc_drop": -0.00042746265172733576,
+   "andersen_group": "Enabling"
+  },
+  {
+   "feature": "age",
+   "gini": 0.04152908775924971,
+   "permutation_auc_drop": 0.0035358309990663065,
+   "andersen_group": "Predisposing"
+  },
+  {
+   "feature": "dow",
+   "gini": 0.030460956407477563,
+   "permutation_auc_drop": -0.003843516573295965,
+   "andersen_group": "Enabling"
+  },
+  {
+   "feature": "lead_days",
+   "gini": 0.02665061176428266,
+   "permutation_auc_drop": 0.006161881419234379,
+   "andersen_group": "Enabling"
+  },
+  {
+   "feature": "out_area",
+   "gini": 0.015118453761894867,
+   "permutation_auc_drop": -0.0016577672735761087,
+   "andersen_group": "Enabling"
+  }
+ ],
+ "risk_table": {
+  "high": {
+   "n": 340,
+   "noshow_rate": 0.3029411764705882
+  },
+  "medium": {
+   "n": 761,
+   "noshow_rate": 0.11826544021024968
+  },
+  "low": {
+   "n": 197,
+   "noshow_rate": 0.08629441624365482
+  }
+ }
+}

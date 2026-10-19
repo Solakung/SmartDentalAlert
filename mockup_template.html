@@ -1,0 +1,206 @@
+<title>ระบบเตือนนัดทันตกรรม</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: ตารางนัดรายวันทางซ้าย + แผงรายละเอียดผู้ป่วยทางขวา (มือถือ: แผงเลื่อนลงใต้รายการ) */
+:root{
+  --bg:#f3f5f6; --surface:#ffffff; --surface2:#eaeff1; --line:#d6dde0; --fg:#18242b; --muted:#5a6b74;
+  --accent:#17566e; --accent-fg:#ffffff; --accent-soft:#dcebf1;
+  --hi:#b3261e; --hi-bg:#fbe3e0; --mid:#8a5a00; --mid-bg:#fbefcf; --lo:#1d6b3a; --lo-bg:#dcf1e2;
+  --font:'IBM Plex Sans Thai','Noto Sans Thai',system-ui,sans-serif; --mono:'IBM Plex Mono',ui-monospace,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f1a1f; --surface:#17252c; --surface2:#1e2f37; --line:#2c424c; --fg:#e6eef1; --muted:#97aab3;
+  --accent:#6cc0dc; --accent-fg:#06222d; --accent-soft:#1b3a47;
+  --hi:#ff8f86; --hi-bg:#44211f; --mid:#f0c35c; --mid-bg:#40330f; --lo:#7fd69a; --lo-bg:#173a25; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1a1f; --surface:#17252c; --surface2:#1e2f37; --line:#2c424c; --fg:#e6eef1; --muted:#97aab3;
+  --accent:#6cc0dc; --accent-fg:#06222d; --accent-soft:#1b3a47;
+  --hi:#ff8f86; --hi-bg:#44211f; --mid:#f0c35c; --mid-bg:#40330f; --lo:#7fd69a; --lo-bg:#173a25; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--font);font-size:15px;line-height:1.55;
+  padding-block:20px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+header{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:flex-end;justify-content:space-between}
+h1{font-size:1.5rem;line-height:1.25;margin:0;font-weight:700;text-wrap:balance}
+.sub{color:var(--muted);margin:2px 0 0;font-size:.9rem}
+.badge{font-size:.78rem;font-weight:600;padding:4px 10px;border-radius:4px;background:var(--mid-bg);color:var(--mid);white-space:nowrap}
+nav.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line)}
+nav.tabs button{font:inherit;font-weight:500;background:none;border:0;color:var(--muted);padding:10px 16px;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-1px}
+nav.tabs button[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.sum{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.sum button{font:inherit;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:12px 14px;cursor:pointer;color:var(--fg);display:flex;flex-direction:column;gap:2px}
+.sum button[aria-pressed="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.sum .n{font-size:1.8rem;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums}
+.sum .l{font-size:.85rem;color:var(--muted)}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:baseline}
+.hi{--c:var(--hi);--cb:var(--hi-bg)}.medium{--c:var(--mid);--cb:var(--mid-bg)}.low{--c:var(--lo);--cb:var(--lo-bg)}
+.high{--c:var(--hi);--cb:var(--hi-bg)}
+.dot{background:var(--c)}
+.main{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:18px;align-items:start}
+@media(max-width:820px){.main{grid-template-columns:minmax(0,1fr)}}
+.day{margin-bottom:14px}
+.day h3{margin:0 0 6px;font-size:.85rem;font-weight:600;color:var(--muted);letter-spacing:.02em}
+.list{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:6px;background:var(--surface);overflow:hidden}
+.row{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px 14px;border:0;border-bottom:1px solid var(--line);background:none;font:inherit;color:inherit;text-align:left;cursor:pointer;width:100%}
+.row:last-child{border-bottom:0}
+.row:hover{background:var(--surface2)}
+.row[aria-current="true"]{background:var(--accent-soft)}
+.row .t{font-size:.8rem;color:var(--muted)}
+.row .id{font-family:var(--mono);font-weight:500}
+.row .meta{display:block;font-size:.85rem;color:var(--muted)}
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:4px;padding:3px 9px;font-size:.82rem;font-weight:600;background:var(--cb);color:var(--c);white-space:nowrap}
+.pill b{font-family:var(--mono);font-weight:500}
+.done-mark{font-size:.75rem;color:var(--lo);font-weight:600;display:block;text-align:right}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:18px;display:flex;flex-direction:column;gap:14px;position:sticky;top:12px}
+@media(max-width:820px){.panel{position:static}}
+.panel h2{margin:0;font-size:1.15rem}
+.kv{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 16px;margin:0}
+.kv div{min-width:0}.kv dt{font-size:.78rem;color:var(--muted)}.kv dd{margin:0;font-weight:500}
+.reasons{margin:0;padding-left:1.2em}.reasons li{margin:2px 0}
+.sec{font-size:.78rem;font-weight:600;color:var(--muted);letter-spacing:.04em;margin:0 0 6px}
+.gauge{height:8px;border-radius:4px;background:var(--surface2);position:relative;overflow:hidden}
+.gauge i{position:absolute;inset:0 auto 0 0;background:var(--c);border-radius:4px}
+.act{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--line)}
+.act input{width:20px;height:20px;margin-top:2px;accent-color:var(--accent);flex:none}
+.act label{cursor:pointer}
+.act input:checked + label{color:var(--muted);text-decoration:line-through}
+.note{font-size:.82rem;color:var(--muted);margin:0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:18px}
+.card h2{font-size:1.05rem;margin:0 0 4px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px}
+.mets{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin-top:12px}
+.mets div{background:var(--surface2);border-radius:4px;padding:10px 12px}
+.mets .v{font-size:1.4rem;font-weight:700;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.mets .k{font-size:.78rem;color:var(--muted)}
+.bar{display:grid;grid-template-columns:minmax(90px,130px) minmax(0,1fr) 52px;gap:10px;align-items:center;margin:7px 0;font-size:.88rem}
+.bar .track{height:14px;background:var(--surface2);border-radius:3px;overflow:hidden}
+.bar .fill{height:100%;border-radius:3px}
+.bar .num{font-family:var(--mono);font-size:.8rem;text-align:right;color:var(--muted)}
+.g-Predisposing{background:var(--accent)}.g-Enabling{background:var(--mid)}.g-Need{background:var(--lo)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:.82rem;color:var(--muted);margin:6px 0 4px}
+.legend span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;background:var(--c)}
+.risk3{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.footer{font-size:.82rem;color:var(--muted)}
+@media(prefers-reduced-motion:no-preference){.gauge i,.bar .fill{transition:width .3s}}
+</style>
+
+<div class="wrap">
+<header>
+  <div>
+    <h1>ระบบเตือนนัดทันตกรรม ผู้สูงอายุ</h1>
+    <p class="sub">ภาพจำลองระบบสนับสนุนการตัดสินใจเชิงรุก · รพ.สต.บ้านเตาถ่าน</p>
+  </div>
+  <span class="badge">ข้อมูลจำลองเพื่อทดลองใช้ ไม่ใช่ผู้ป่วยจริง</span>
+</header>
+
+<nav class="tabs" role="tablist">
+  <button role="tab" id="tab-q" aria-selected="true" aria-controls="v-q">คิวนัดหมาย</button>
+  <button role="tab" id="tab-m" aria-selected="false" aria-controls="v-m">ปัจจัยเสี่ยงและโมเดล</button>
+</nav>
+
+<section id="v-q" role="tabpanel" aria-labelledby="tab-q" style="display:flex;flex-direction:column;gap:18px">
+  <div class="sum" id="sum"></div>
+  <div class="main">
+    <div id="queue"></div>
+    <aside class="panel" id="panel" aria-live="polite"></aside>
+  </div>
+</section>
+
+<section id="v-m" role="tabpanel" aria-labelledby="tab-m" hidden style="flex-direction:column;gap:18px">
+  <div class="grid2">
+    <div class="card">
+      <h2>ประสิทธิภาพบนชุดทดสอบ (ปี 2568)</h2>
+      <p class="note" id="nsplit"></p>
+      <div class="mets" id="mets"></div>
+      <p class="note" style="margin-top:12px">จุดตัดความเสี่ยงกำหนดจากชุด Validation (ครึ่งหลังปี 2567) คะแนนความเสี่ยงที่แสดงเป็นอันดับเปรียบเทียบ ไม่ใช่ความน่าจะเป็นที่ปรับเทียบแล้ว เพราะโมเดลฝึกด้วย SMOTE</p>
+    </div>
+    <div class="card">
+      <h2>ผลจัดกลุ่ม 3 ระดับบนชุดทดสอบ</h2>
+      <p class="note">อัตราขาดนัดจริงของแต่ละกลุ่ม</p>
+      <div class="risk3" id="risk3"></div>
+    </div>
+  </div>
+  <div class="card">
+    <h2>ความสำคัญของปัจจัยตามกรอบ Andersen</h2>
+    <p class="note">แถบบน = ค่า Permutation (AUC ที่ลดลงเมื่อสลับตัวแปร) · แถบล่าง = Gini importance เรียงตามค่า Permutation</p>
+    <div class="legend" id="legend"></div>
+    <div id="imp"></div>
+  </div>
+</section>
+
+<p class="footer">ข้อมูลทั้งหมดสร้างจากชุดจำลองตามพจนานุกรมตัวแปร JHCIS รหัสผู้ป่วยเป็นรหัสวิจัย ไม่มีชื่อหรือเลขบัตรประชาชน ใช้สำหรับระยะที่ 3 (R2) ของงานวิจัยเท่านั้น</p>
+</div>
+
+<script>
+const D = __DATA__;
+const LV = {high:'เสี่ยงสูง',medium:'เสี่ยงปานกลาง',low:'เสี่ยงต่ำ'};
+const ACTIONS = {
+  high:['ประสาน อสม. ประจำคุ้มบ้านเยี่ยมบ้านก่อนวันนัด','โทรประสานญาติหรือผู้ดูแลเพื่อยืนยันการมา','ประสานรถรับส่งในชุมชน หากเดินทางลำบาก'],
+  medium:['โทรติดตามผู้ดูแลล่วงหน้า 2–3 วัน','ประเมินความพร้อมและยืนยันการเดินทาง'],
+  low:['ส่ง SMS แจ้งเตือนอัตโนมัติก่อนวันนัด']
+};
+const done = {}; let filter = null, sel = null;
+const $ = s => document.querySelector(s);
+const score = a => Math.round(a.p*100);
+const fmtDay = s => new Date(s+'T00:00:00').toLocaleDateString('th-TH',{weekday:'long',day:'numeric',month:'short',year:'numeric'});
+const esc = s => String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const key = a => a.id+a.date;
+const isDone = a => ACTIONS[a.level].every((_,i)=>done[key(a)+i]);
+
+function renderSum(){
+  const c = {high:0,medium:0,low:0}; D.appts.forEach(a=>c[a.level]++);
+  $('#sum').innerHTML = `<button data-f="" aria-pressed="${filter===null}"><span class="n">${D.appts.length}</span><span class="l">นัดทั้งหมดสัปดาห์นี้</span></button>` +
+    ['high','medium','low'].map(l=>`<button class="${l}" data-f="${l}" aria-pressed="${filter===l}"><span class="n">${c[l]}</span><span class="l"><i class="dot"></i>${LV[l]}</span></button>`).join('');
+  document.querySelectorAll('#sum button').forEach(b=>b.onclick=()=>{filter=b.dataset.f||null;renderSum();renderQueue();});
+}
+function renderQueue(){
+  const rows = D.appts.filter(a=>!filter||a.level===filter);
+  const days = {}; rows.forEach(a=>(days[a.date]=days[a.date]||[]).push(a));
+  $('#queue').innerHTML = Object.keys(days).map(d=>`<div class="day"><h3>${fmtDay(d)}</h3><div class="list">`+
+    days[d].map(a=>`<button class="row ${a.level}" data-k="${key(a)}" aria-current="${sel===key(a)}">
+      <span class="t">${a.period==='morning'?'เช้า':'บ่าย'}</span>
+      <span><span class="id">${a.id}</span> <span class="meta">${a.age} ปี · ${a.proc}</span></span>
+      <span><span class="pill"><i class="dot"></i>${LV[a.level]} <b>${score(a)}</b></span>${isDone(a)?'<span class="done-mark">ดำเนินการครบ</span>':''}</span></button>`).join('')+`</div></div>`).join('') || '<p class="note">ไม่มีนัดในกลุ่มนี้</p>';
+  document.querySelectorAll('.row').forEach(r=>r.onclick=()=>{sel=r.dataset.k;renderQueue();renderPanel();});
+}
+function renderPanel(){
+  const a = D.appts.find(x=>key(x)===sel);
+  if(!a){$('#panel').innerHTML='<h2>เลือกผู้ป่วยจากคิวนัด</h2><p class="note">ระบบจะแสดงเหตุผลที่เสี่ยงและมาตรการติดตามที่เหมาะกับระดับความเสี่ยง</p>';return;}
+  $('#panel').className = 'panel '+a.level;
+  $('#panel').innerHTML = `
+    <div><h2><span style="font-family:var(--mono)">${a.id}</span> <span class="pill" style="margin-left:6px"><i class="dot"></i>${LV[a.level]}</span></h2>
+    <p class="note">${fmtDay(a.date)} · ${a.period==='morning'?'ช่วงเช้า':'ช่วงบ่าย'} · ${a.proc}</p></div>
+    <div><p class="sec">คะแนนความเสี่ยง</p><div class="gauge"><i style="width:${Math.min(100,score(a)*1.6)}%"></i></div>
+    <p class="note" style="margin-top:4px">${score(a)} / 100 · จุดตัดสูง ≥ ${Math.round(D.cut.high_from*100)} · ต่ำ &lt; ${Math.round(D.cut.low_below*100)}</p></div>
+    <dl class="kv"><div><dt>อายุ / เพศ</dt><dd>${a.age} ปี · ${a.sex==='F'?'หญิง':'ชาย'}</dd></div>
+      <div><dt>สถานภาพสมรส</dt><dd>${a.marital}</dd></div>
+      <div><dt>ที่พักอาศัย</dt><dd>${a.outArea?'นอกเขต รพ.สต.':'ในเขต รพ.สต.'}</dd></div>
+      <div><dt>สิทธิการรักษา</dt><dd>${a.scheme}</dd></div>
+      <div><dt>นัดล่วงหน้า</dt><dd>${a.lead} วัน</dd></div>
+      <div><dt>ประวัติขาดนัด</dt><dd>${a.priorNs} จาก ${a.prior} นัด</dd></div></dl>
+    <div><p class="sec">ปัจจัยที่พบ</p>${a.reasons.length?'<ul class="reasons">'+a.reasons.map(r=>`<li>${esc(r)}</li>`).join('')+'</ul>':'<p class="note">ไม่พบปัจจัยเสี่ยงเด่น</p>'}</div>
+    <div><p class="sec">มาตรการที่แนะนำ</p>`+ACTIONS[a.level].map((t,i)=>`<div class="act"><input type="checkbox" id="a${i}" data-i="${i}" ${done[key(a)+i]?'checked':''}><label for="a${i}">${t}</label></div>`).join('')+`</div>
+    <p class="note">ผลประเมินใช้เพื่อจัดลำดับการติดตามเท่านั้น ไม่ใช้ปฏิเสธหรือตัดสิทธิ์การรักษา</p>`;
+  document.querySelectorAll('#panel input').forEach(c=>c.onchange=()=>{done[key(a)+c.dataset.i]=c.checked;renderQueue();});
+}
+function renderModel(){
+  const m = D.metrics, p = v=>v.toFixed(2);
+  $('#nsplit').textContent = `ฝึก ${D.n.train} นัด (ปี 2566–67) · ทดสอบ ${D.n.test} นัด (ปี 2568) · RF + SMOTE ที่จุดตัดสูง`;
+  $('#mets').innerHTML = [['AUC',m.auc],['PR-AUC',m.pr_auc],['Recall',m.recall],['Precision',m.precision],['F1',m.f1],['Accuracy',m.accuracy]]
+    .map(([k,v])=>`<div><div class="v">${p(v)}</div><div class="k">${k}</div></div>`).join('');
+  $('#risk3').innerHTML = ['high','medium','low'].map(l=>{const r=D.risk[l];return `<div class="${l}"><div style="display:flex;justify-content:space-between;gap:8px"><span><i class="dot"></i>${LV[l]} · ${r.n} นัด</span><b style="font-family:var(--mono)">${(r.noshow_rate*100).toFixed(1)}%</b></div><div class="gauge" style="margin-top:4px"><i style="width:${Math.min(100,r.noshow_rate*100*2.5)}%"></i></div></div>`}).join('');
+  const NM = {occupation:'อาชีพ',procedure:'ประเภทหัตถการ',sex:'เพศ',prior_noshows:'จำนวนครั้งที่เคยขาดนัด',out_area:'ที่พักนอกเขต',prior_noshow_rate:'อัตราขาดนัดสะสม',marital:'สถานภาพสมรส',period:'ช่วงเวลานัด',age:'อายุ',distance_km:'ระยะทางจากบ้าน',lead_days:'นัดล่วงหน้า (วัน)',prior_appts:'จำนวนนัดที่ผ่านมา',education:'ระดับการศึกษา',scheme:'สิทธิการรักษา',dow:'วันในสัปดาห์',has_phone:'มีโทรศัพท์',chronic_disease:'โรคเรื้อรัง'};
+  const GN = {Predisposing:'ปัจจัยพื้นฐาน',Enabling:'ปัจจัยเอื้ออำนวย',Need:'ปัจจัยความจำเป็น'};
+  $('#legend').innerHTML = Object.keys(GN).map(g=>`<span style="--c:var(--${g==='Predisposing'?'accent':g==='Enabling'?'mid':'lo'})">${GN[g]}</span>`).join('');
+  const imp = [...D.imp].sort((a,b)=>b.pm-a.pm).slice(0,10);
+  const mp = Math.max(...imp.map(i=>Math.max(i.pm,0)),1e-9), mg = Math.max(...imp.map(i=>i.g));
+  $('#imp').innerHTML = imp.map(i=>`<div class="bar"><span>${NM[i.f]||i.f}</span><div><div class="track"><div class="fill g-${i.grp}" style="width:${Math.max(0,i.pm)/mp*100}%"></div></div><div class="track" style="margin-top:3px;height:8px;opacity:.55"><div class="fill g-${i.grp}" style="width:${i.g/mg*100}%"></div></div></div><span class="num">${i.pm.toFixed(3)}</span></div>`).join('');
+}
+document.querySelectorAll('nav.tabs button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('nav.tabs button').forEach(x=>x.setAttribute('aria-selected',x===b));
+  const q = b.id==='tab-q'; $('#v-q').hidden=!q; $('#v-m').hidden=q; if(!q) $('#v-m').style.display='flex'; });
+renderSum(); renderQueue(); renderPanel(); renderModel();
+const first = D.appts.find(a=>a.level==='high'); if(first){sel=key(first);renderQueue();renderPanel();}
+</script>
