@@ -84,6 +84,26 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 .risk3{display:flex;flex-direction:column;gap:8px;margin-top:10px}
 .footer{font-size:.82rem;color:var(--muted)}
 @media(prefers-reduced-motion:no-preference){.gauge i,.bar .fill{transition:width .3s}}
+
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--surface)}
+.seg button{font:inherit;font-size:.88rem;font-weight:500;border:0;background:none;color:var(--muted);padding:7px 14px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-fg)}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px 12px;margin-top:10px}
+.form label{display:flex;flex-direction:column;gap:3px;font-size:.8rem;color:var(--muted)}
+input[type=text],input[type=date],input[type=number],select,textarea{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:7px 9px;min-width:0;width:100%}
+textarea{font-family:var(--mono);font-size:.8rem;min-height:110px;resize:vertical}
+.btn{font:inherit;font-weight:600;border-radius:5px;padding:8px 16px;cursor:pointer;border:1px solid var(--accent);background:var(--accent);color:var(--accent-fg)}
+.btn.sec2{background:none;color:var(--accent)}
+.btn.sm{padding:5px 12px;font-size:.85rem}
+.btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.msg{font-size:.88rem;margin:10px 0 0;padding:8px 12px;border-radius:4px;background:var(--surface2)}
+.msg.err{background:var(--hi-bg);color:var(--hi)}.msg.ok{background:var(--lo-bg);color:var(--lo)}
+code.block{display:block;white-space:pre;overflow-x:auto;background:var(--surface2);padding:10px 12px;border-radius:4px;font-family:var(--mono);font-size:.78rem;margin:8px 0 0}
+.outc{display:flex;gap:8px}
+.outc button{flex:1;font:inherit;padding:8px;border-radius:5px;border:1px solid var(--line);background:var(--bg);color:var(--fg);cursor:pointer}
+.outc button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);font-weight:600}
+.cutrow{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:10px}
+.tag{font-size:.72rem;font-weight:600;padding:2px 7px;border-radius:3px;background:var(--accent-soft);color:var(--accent);margin-left:6px;vertical-align:middle}
 </style>
 
 <div class="wrap">
@@ -92,45 +112,90 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
     <h1>ระบบเตือนนัดทันตกรรม ผู้สูงอายุ</h1>
     <p class="sub">ภาพจำลองระบบสนับสนุนการตัดสินใจเชิงรุก · รพ.สต.บ้านเตาถ่าน</p>
   </div>
-  <span class="badge">ข้อมูลจำลองเพื่อทดลองใช้ ไม่ใช่ผู้ป่วยจริง</span>
+  <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+    <div class="seg" role="group" aria-label="บทบาทผู้ใช้"><button id="r-staff" aria-pressed="true">เจ้าหน้าที่</button><button id="r-admin" aria-pressed="false">แอดมิน</button></div>
+    <span class="badge">ข้อมูลจำลอง ไม่ใช่ผู้ป่วยจริง</span>
+  </div>
 </header>
 
-<nav class="tabs" role="tablist">
-  <button role="tab" id="tab-q" aria-selected="true" aria-controls="v-q">คิวนัดหมาย</button>
-  <button role="tab" id="tab-m" aria-selected="false" aria-controls="v-m">ปัจจัยเสี่ยงและโมเดล</button>
-</nav>
+<nav class="tabs" role="tablist" id="tabs"></nav>
 
-<section id="v-q" role="tabpanel" aria-labelledby="tab-q" style="display:flex;flex-direction:column;gap:18px">
+<section id="v-q" role="tabpanel" style="display:flex;flex-direction:column;gap:18px">
   <div class="sum" id="sum"></div>
-  <div class="main">
-    <div id="queue"></div>
-    <aside class="panel" id="panel" aria-live="polite"></aside>
+  <div class="main"><div id="queue"></div><aside class="panel" id="panel" aria-live="polite"></aside></div>
+</section>
+
+<section id="v-i" role="tabpanel" hidden>
+  <div class="grid2">
+    <div class="card">
+      <h2>เพิ่มนัดหมายทีละราย</h2>
+      <p class="note">ใช้รหัสวิจัยเท่านั้น ห้ามกรอกชื่อ-นามสกุลหรือเลขบัตรประชาชน</p>
+      <div class="form">
+        <label>รหัสผู้ป่วย<input type="text" id="f-id" placeholder="P0123" autocomplete="off"></label>
+        <label>วันที่นัด<input type="date" id="f-date"></label>
+        <label>ช่วงเวลา<select id="f-period"><option value="morning">เช้า</option><option value="afternoon">บ่าย</option></select></label>
+        <label>หัตถการ<select id="f-proc"><option>ขูดหินปูน</option><option>ถอนฟัน</option><option>อุดฟัน</option><option>ฟันเทียม</option><option>รักษาปริทันต์</option></select></label>
+        <label>อายุ (ปี)<input type="number" id="f-age" min="60" max="110" value="70"></label>
+        <label>เพศ<select id="f-sex"><option value="F">หญิง</option><option value="M">ชาย</option></select></label>
+        <label>คะแนนความเสี่ยง (0–100)<input type="number" id="f-score" min="0" max="100" value="20"></label>
+      </div>
+      <div class="btns"><button class="btn" id="f-add">เพิ่มเข้าคิว</button></div>
+      <div id="f-msg"></div>
+    </div>
+    <div class="card">
+      <h2>นำเข้าหลายรายจากไฟล์ CSV</h2>
+      <p class="note">คะแนนความเสี่ยงคำนวณจากโมเดลที่ผู้วิจัยรันแยก หน้านี้ไม่คำนวณคะแนนเอง</p>
+      <code class="block">patient_id,appt_date,period,procedure,age,sex,risk_score
+P0123,2026-11-03,morning,ขูดหินปูน,72,F,41
+P0456,2026-11-03,afternoon,ถอนฟัน,68,M,12</code>
+      <div class="form" style="grid-template-columns:1fr"><label>เลือกไฟล์ .csv<input type="file" id="c-file" accept=".csv,text/csv"></label>
+      <label>หรือวางข้อความ CSV<textarea id="c-text" placeholder="patient_id,appt_date,period,procedure,age,sex,risk_score"></textarea></label></div>
+      <div class="btns"><button class="btn" id="c-go">นำเข้า</button><button class="btn sec2" id="c-clear">ล้างนัดที่นำเข้าทั้งหมด</button></div>
+      <div id="c-msg"></div>
+    </div>
   </div>
 </section>
 
-<section id="v-m" role="tabpanel" aria-labelledby="tab-m" hidden style="flex-direction:column;gap:18px">
+<section id="v-m" role="tabpanel" hidden>
   <div class="grid2">
+    <div class="card">
+      <h2>จุดตัดระดับความเสี่ยง</h2>
+      <p class="note">กำหนดจากชุด Validation ปรับได้เพื่อทดลองดูผลต่อจำนวนนัดในแต่ละสี</p>
+      <div class="cutrow">
+        <label class="note">เสี่ยงสูงเริ่มที่คะแนน<input type="number" id="cut-high" min="1" max="100"></label>
+        <label class="note">เสี่ยงต่ำต่ำกว่าคะแนน<input type="number" id="cut-low" min="0" max="99"></label>
+      </div>
+      <div class="btns"><button class="btn sec2 sm" id="cut-reset">คืนค่าจากโมเดล</button></div>
+      <div id="cut-sum" class="note" style="margin-top:10px"></div>
+    </div>
+    <div class="card">
+      <h2>ผลการมา/ขาดนัดที่บันทึกโดยเจ้าหน้าที่</h2>
+      <p class="note">ใช้ตรวจว่าระดับความเสี่ยงตรงกับผลจริงหรือไม่</p>
+      <div id="outc-sum" class="risk3"></div>
+    </div>
+  </div>
+  <div class="grid2" style="margin-top:18px">
     <div class="card">
       <h2>ประสิทธิภาพบนชุดทดสอบ (ปี 2568)</h2>
       <p class="note" id="nsplit"></p>
       <div class="mets" id="mets"></div>
-      <p class="note" style="margin-top:12px">จุดตัดความเสี่ยงกำหนดจากชุด Validation (ครึ่งหลังปี 2567) คะแนนความเสี่ยงที่แสดงเป็นอันดับเปรียบเทียบ ไม่ใช่ความน่าจะเป็นที่ปรับเทียบแล้ว เพราะโมเดลฝึกด้วย SMOTE</p>
+      <p class="note" style="margin-top:12px">คะแนนความเสี่ยงเป็นอันดับเปรียบเทียบ ไม่ใช่ความน่าจะเป็นที่ปรับเทียบแล้ว เพราะโมเดลฝึกด้วย SMOTE</p>
     </div>
     <div class="card">
       <h2>ผลจัดกลุ่ม 3 ระดับบนชุดทดสอบ</h2>
-      <p class="note">อัตราขาดนัดจริงของแต่ละกลุ่ม</p>
+      <p class="note">อัตราขาดนัดจริงของแต่ละกลุ่ม ที่จุดตัดจากโมเดล</p>
       <div class="risk3" id="risk3"></div>
     </div>
   </div>
-  <div class="card">
+  <div class="card" style="margin-top:18px">
     <h2>ความสำคัญของปัจจัยตามกรอบ Andersen</h2>
-    <p class="note">แถบบน = ค่า Permutation (AUC ที่ลดลงเมื่อสลับตัวแปร) · แถบล่าง = Gini importance เรียงตามค่า Permutation</p>
+    <p class="note">แถบบน = Permutation (AUC ที่ลดลงเมื่อสลับตัวแปร) · แถบล่าง = Gini importance</p>
     <div class="legend" id="legend"></div>
     <div id="imp"></div>
   </div>
 </section>
 
-<p class="footer">ข้อมูลทั้งหมดสร้างจากชุดจำลองตามพจนานุกรมตัวแปร JHCIS รหัสผู้ป่วยเป็นรหัสวิจัย ไม่มีชื่อหรือเลขบัตรประชาชน ใช้สำหรับระยะที่ 3 (R2) ของงานวิจัยเท่านั้น</p>
+<p class="footer">บทบาทเจ้าหน้าที่/แอดมินในหน้านี้เป็นการสาธิตการแบ่งหน้าจอ ไม่มีระบบล็อกอินจริง ข้อมูลที่เพิ่มหรือบันทึกเก็บในเบราว์เซอร์เครื่องนี้เท่านั้น ข้อมูลตั้งต้นเป็นข้อมูลจำลอง ใช้กับระยะที่ 3 (R2) ของงานวิจัยเท่านั้น</p>
 </div>
 
 <script>
@@ -141,66 +206,137 @@ const ACTIONS = {
   medium:['โทรติดตามผู้ดูแลล่วงหน้า 2–3 วัน','ประเมินความพร้อมและยืนยันการเดินทาง'],
   low:['ส่ง SMS แจ้งเตือนอัตโนมัติก่อนวันนัด']
 };
-const done = {}; let filter = null, sel = null;
 const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const PROCS = ['ขูดหินปูน','ถอนฟัน','อุดฟัน','ฟันเทียม','รักษาปริทันต์'];
+// ---- สถานะ (เก็บในเบราว์เซอร์นี้เท่านั้น) ----
+const DEF_CUT = {low:Math.round(D.cut.low_below*100), high:Math.round(D.cut.high_from*100)};
+let S = {added:[], cut:{...DEF_CUT}, done:{}, outcome:{}};
+try{const raw=localStorage.getItem('sda-v1'); if(raw){const p=JSON.parse(raw); S={...S,...p};}}catch(e){}
+const save=()=>{try{localStorage.setItem('sda-v1',JSON.stringify(S))}catch(e){}};
+let role='staff', tab='q', filter=null, sel=null;
+const all = () => D.appts.concat(S.added);
 const score = a => Math.round(a.p*100);
-const fmtDay = s => new Date(s+'T00:00:00').toLocaleDateString('th-TH',{weekday:'long',day:'numeric',month:'short',year:'numeric'});
-const esc = s => String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const lvl = a => { const v=score(a); return v>=S.cut.high?'high':v>=S.cut.low?'medium':'low'; };
 const key = a => a.id+a.date;
-const isDone = a => ACTIONS[a.level].every((_,i)=>done[key(a)+i]);
+const fmtDay = s => new Date(s+'T00:00:00').toLocaleDateString('th-TH',{weekday:'long',day:'numeric',month:'short',year:'numeric'});
+const isDone = a => ACTIONS[lvl(a)].every((_,i)=>S.done[key(a)+i]);
 
+// ---- แท็บตามบทบาท ----
+const TABS = {staff:[['q','คิวนัดหมาย']], admin:[['q','คิวนัดหมาย'],['i','นำเข้านัดหมาย'],['m','จุดตัดและโมเดล']]};
+function renderTabs(){
+  if(!TABS[role].some(t=>t[0]===tab)) tab='q';
+  $('#tabs').innerHTML = TABS[role].map(([k,l])=>`<button role="tab" data-t="${k}" aria-selected="${tab===k}">${l}</button>`).join('');
+  document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>{tab=b.dataset.t;renderTabs();});
+  ['q','i','m'].forEach(k=>{$('#v-'+k).hidden = tab!==k;});
+  if(tab==='m') renderAdmin();
+  $('#r-staff').setAttribute('aria-pressed',role==='staff'); $('#r-admin').setAttribute('aria-pressed',role==='admin');
+}
+$('#r-staff').onclick=()=>{role='staff';renderTabs();renderPanel();};
+$('#r-admin').onclick=()=>{role='admin';renderTabs();renderPanel();};
+
+// ---- คิวนัด (ทั้งสองบทบาท) ----
 function renderSum(){
-  const c = {high:0,medium:0,low:0}; D.appts.forEach(a=>c[a.level]++);
-  $('#sum').innerHTML = `<button data-f="" aria-pressed="${filter===null}"><span class="n">${D.appts.length}</span><span class="l">นัดทั้งหมดสัปดาห์นี้</span></button>` +
+  const c={high:0,medium:0,low:0}; all().forEach(a=>c[lvl(a)]++);
+  $('#sum').innerHTML = `<button data-f="" aria-pressed="${filter===null}"><span class="n">${all().length}</span><span class="l">นัดทั้งหมดในคิว</span></button>` +
     ['high','medium','low'].map(l=>`<button class="${l}" data-f="${l}" aria-pressed="${filter===l}"><span class="n">${c[l]}</span><span class="l"><i class="dot"></i>${LV[l]}</span></button>`).join('');
   document.querySelectorAll('#sum button').forEach(b=>b.onclick=()=>{filter=b.dataset.f||null;renderSum();renderQueue();});
 }
 function renderQueue(){
-  const rows = D.appts.filter(a=>!filter||a.level===filter);
-  const days = {}; rows.forEach(a=>(days[a.date]=days[a.date]||[]).push(a));
+  const rows = all().filter(a=>!filter||lvl(a)===filter).sort((a,b)=>a.date.localeCompare(b.date)||a.period.localeCompare(b.period));
+  const days={}; rows.forEach(a=>(days[a.date]=days[a.date]||[]).push(a));
   $('#queue').innerHTML = Object.keys(days).map(d=>`<div class="day"><h3>${fmtDay(d)}</h3><div class="list">`+
-    days[d].map(a=>`<button class="row ${a.level}" data-k="${key(a)}" aria-current="${sel===key(a)}">
+    days[d].map(a=>`<button class="row ${lvl(a)}" data-k="${esc(key(a))}" aria-current="${sel===key(a)}">
       <span class="t">${a.period==='morning'?'เช้า':'บ่าย'}</span>
-      <span><span class="id">${a.id}</span> <span class="meta">${a.age} ปี · ${a.proc}</span></span>
-      <span><span class="pill"><i class="dot"></i>${LV[a.level]} <b>${score(a)}</b></span>${isDone(a)?'<span class="done-mark">ดำเนินการครบ</span>':''}</span></button>`).join('')+`</div></div>`).join('') || '<p class="note">ไม่มีนัดในกลุ่มนี้</p>';
+      <span><span class="id">${esc(a.id)}</span> <span class="meta">${a.age} ปี · ${esc(a.proc)}</span></span>
+      <span><span class="pill"><i class="dot"></i>${LV[lvl(a)]} <b>${score(a)}</b></span>${S.outcome[key(a)]?`<span class="done-mark" ${S.outcome[key(a)]==='noshow'?'style="color:var(--hi)"':''}>${S.outcome[key(a)]==='came'?'มาตามนัด':'ขาดนัด'}</span>`:isDone(a)?'<span class="done-mark">ดำเนินการครบ</span>':''}</span></button>`).join('')+`</div></div>`).join('') || '<p class="note">ไม่มีนัดในกลุ่มนี้</p>';
   document.querySelectorAll('.row').forEach(r=>r.onclick=()=>{sel=r.dataset.k;renderQueue();renderPanel();});
 }
 function renderPanel(){
-  const a = D.appts.find(x=>key(x)===sel);
-  if(!a){$('#panel').innerHTML='<h2>เลือกผู้ป่วยจากคิวนัด</h2><p class="note">ระบบจะแสดงเหตุผลที่เสี่ยงและมาตรการติดตามที่เหมาะกับระดับความเสี่ยง</p>';return;}
-  $('#panel').className = 'panel '+a.level;
-  $('#panel').innerHTML = `
-    <div><h2><span style="font-family:var(--mono)">${a.id}</span> <span class="pill" style="margin-left:6px"><i class="dot"></i>${LV[a.level]}</span></h2>
-    <p class="note">${fmtDay(a.date)} · ${a.period==='morning'?'ช่วงเช้า':'ช่วงบ่าย'} · ${a.proc}</p></div>
+  const a = all().find(x=>key(x)===sel), P=$('#panel');
+  if(!a){P.className='panel';P.innerHTML='<h2>เลือกผู้ป่วยจากคิวนัด</h2><p class="note">ระบบจะแสดงเหตุผลที่เสี่ยงและมาตรการติดตามที่เหมาะกับระดับความเสี่ยง</p>';return;}
+  const L=lvl(a), na='ไม่มีข้อมูล', k=key(a);
+  P.className='panel '+L;
+  P.innerHTML = `
+    <div><h2><span style="font-family:var(--mono)">${esc(a.id)}</span> <span class="pill" style="margin-left:6px"><i class="dot"></i>${LV[L]}</span></h2>
+    <p class="note">${fmtDay(a.date)} · ${a.period==='morning'?'ช่วงเช้า':'ช่วงบ่าย'} · ${esc(a.proc)}</p></div>
     <div><p class="sec">คะแนนความเสี่ยง</p><div class="gauge"><i style="width:${Math.min(100,score(a)*1.6)}%"></i></div>
-    <p class="note" style="margin-top:4px">${score(a)} / 100 · จุดตัดสูง ≥ ${Math.round(D.cut.high_from*100)} · ต่ำ &lt; ${Math.round(D.cut.low_below*100)}</p></div>
+    <p class="note" style="margin-top:4px">${score(a)} / 100 · สูง ≥ ${S.cut.high} · ต่ำ &lt; ${S.cut.low}</p></div>
     <dl class="kv"><div><dt>อายุ / เพศ</dt><dd>${a.age} ปี · ${a.sex==='F'?'หญิง':'ชาย'}</dd></div>
-      <div><dt>สถานภาพสมรส</dt><dd>${a.marital}</dd></div>
-      <div><dt>ที่พักอาศัย</dt><dd>${a.outArea?'นอกเขต รพ.สต.':'ในเขต รพ.สต.'}</dd></div>
-      <div><dt>สิทธิการรักษา</dt><dd>${a.scheme}</dd></div>
-      <div><dt>นัดล่วงหน้า</dt><dd>${a.lead} วัน</dd></div>
-      <div><dt>ประวัติขาดนัด</dt><dd>${a.priorNs} จาก ${a.prior} นัด</dd></div></dl>
-    <div><p class="sec">ปัจจัยที่พบ</p>${a.reasons.length?'<ul class="reasons">'+a.reasons.map(r=>`<li>${esc(r)}</li>`).join('')+'</ul>':'<p class="note">ไม่พบปัจจัยเสี่ยงเด่น</p>'}</div>
-    <div><p class="sec">มาตรการที่แนะนำ</p>`+ACTIONS[a.level].map((t,i)=>`<div class="act"><input type="checkbox" id="a${i}" data-i="${i}" ${done[key(a)+i]?'checked':''}><label for="a${i}">${t}</label></div>`).join('')+`</div>
+      <div><dt>สถานภาพสมรส</dt><dd>${a.marital||na}</dd></div>
+      <div><dt>ที่พักอาศัย</dt><dd>${a.outArea===undefined?na:a.outArea?'นอกเขต รพ.สต.':'ในเขต รพ.สต.'}</dd></div>
+      <div><dt>สิทธิการรักษา</dt><dd>${a.scheme||na}</dd></div>
+      <div><dt>นัดล่วงหน้า</dt><dd>${a.lead===undefined?na:a.lead+' วัน'}</dd></div>
+      <div><dt>ประวัติขาดนัด</dt><dd>${a.priorNs===undefined?na:a.priorNs+' จาก '+a.prior+' นัด'}</dd></div></dl>
+    <div><p class="sec">ปัจจัยที่พบ</p>${(a.reasons&&a.reasons.length)?'<ul class="reasons">'+a.reasons.map(r=>`<li>${esc(r)}</li>`).join('')+'</ul>':'<p class="note">ไม่พบปัจจัยเสี่ยงเด่นหรือไม่มีข้อมูลเพิ่มเติม</p>'}</div>
+    <div><p class="sec">มาตรการที่แนะนำ</p>`+ACTIONS[L].map((t,i)=>`<div class="act"><input type="checkbox" id="a${i}" data-i="${i}" ${S.done[k+i]?'checked':''}><label for="a${i}">${t}</label></div>`).join('')+`</div>
+    <div><p class="sec">ผลการมารับบริการ (บันทึกหลังวันนัด)</p><div class="outc"><button data-o="came" aria-pressed="${S.outcome[k]==='came'}">มาตามนัด</button><button data-o="noshow" aria-pressed="${S.outcome[k]==='noshow'}">ขาดนัด</button></div></div>
     <p class="note">ผลประเมินใช้เพื่อจัดลำดับการติดตามเท่านั้น ไม่ใช้ปฏิเสธหรือตัดสิทธิ์การรักษา</p>`;
-  document.querySelectorAll('#panel input').forEach(c=>c.onchange=()=>{done[key(a)+c.dataset.i]=c.checked;renderQueue();});
+  P.querySelectorAll('input[type=checkbox]').forEach(c=>c.onchange=()=>{S.done[k+c.dataset.i]=c.checked;save();renderQueue();});
+  P.querySelectorAll('.outc button').forEach(b=>b.onclick=()=>{S.outcome[k]=S.outcome[k]===b.dataset.o?undefined:b.dataset.o;if(!S.outcome[k])delete S.outcome[k];save();renderQueue();renderPanel();});
 }
-function renderModel(){
-  const m = D.metrics, p = v=>v.toFixed(2);
-  $('#nsplit').textContent = `ฝึก ${D.n.train} นัด (ปี 2566–67) · ทดสอบ ${D.n.test} นัด (ปี 2568) · RF + SMOTE ที่จุดตัดสูง`;
-  $('#mets').innerHTML = [['AUC',m.auc],['PR-AUC',m.pr_auc],['Recall',m.recall],['Precision',m.precision],['F1',m.f1],['Accuracy',m.accuracy]]
-    .map(([k,v])=>`<div><div class="v">${p(v)}</div><div class="k">${k}</div></div>`).join('');
-  $('#risk3').innerHTML = ['high','medium','low'].map(l=>{const r=D.risk[l];return `<div class="${l}"><div style="display:flex;justify-content:space-between;gap:8px"><span><i class="dot"></i>${LV[l]} · ${r.n} นัด</span><b style="font-family:var(--mono)">${(r.noshow_rate*100).toFixed(1)}%</b></div><div class="gauge" style="margin-top:4px"><i style="width:${Math.min(100,r.noshow_rate*100*2.5)}%"></i></div></div>`}).join('');
-  const NM = {occupation:'อาชีพ',procedure:'ประเภทหัตถการ',sex:'เพศ',prior_noshows:'จำนวนครั้งที่เคยขาดนัด',out_area:'ที่พักนอกเขต',prior_noshow_rate:'อัตราขาดนัดสะสม',marital:'สถานภาพสมรส',period:'ช่วงเวลานัด',age:'อายุ',distance_km:'ระยะทางจากบ้าน',lead_days:'นัดล่วงหน้า (วัน)',prior_appts:'จำนวนนัดที่ผ่านมา',education:'ระดับการศึกษา',scheme:'สิทธิการรักษา',dow:'วันในสัปดาห์',has_phone:'มีโทรศัพท์',chronic_disease:'โรคเรื้อรัง'};
-  const GN = {Predisposing:'ปัจจัยพื้นฐาน',Enabling:'ปัจจัยเอื้ออำนวย',Need:'ปัจจัยความจำเป็น'};
-  $('#legend').innerHTML = Object.keys(GN).map(g=>`<span style="--c:var(--${g==='Predisposing'?'accent':g==='Enabling'?'mid':'lo'})">${GN[g]}</span>`).join('');
-  const imp = [...D.imp].sort((a,b)=>b.pm-a.pm).slice(0,10);
-  const mp = Math.max(...imp.map(i=>Math.max(i.pm,0)),1e-9), mg = Math.max(...imp.map(i=>i.g));
-  $('#imp').innerHTML = imp.map(i=>`<div class="bar"><span>${NM[i.f]||i.f}</span><div><div class="track"><div class="fill g-${i.grp}" style="width:${Math.max(0,i.pm)/mp*100}%"></div></div><div class="track" style="margin-top:3px;height:8px;opacity:.55"><div class="fill g-${i.grp}" style="width:${i.g/mg*100}%"></div></div></div><span class="num">${i.pm.toFixed(3)}</span></div>`).join('');
+
+// ---- นำเข้า (แอดมิน) ----
+const ID_RE=/^P?\d{3,6}$/i, DATE_RE=/^\d{4}-\d{2}-\d{2}$/;
+function mkAppt(r){
+  const id=String(r.id||'').trim(), date=String(r.date||'').trim();
+  if(!ID_RE.test(id)) return 'รหัสผู้ป่วยต้องเป็นรหัสวิจัย เช่น P0123 (ไม่รับชื่อหรือเลขบัตร)';
+  if(!DATE_RE.test(date)||isNaN(new Date(date))) return 'วันที่ต้องอยู่ในรูปแบบ ปปปป-ดด-วว (ค.ศ.)';
+  const sc=Number(r.score); if(!(sc>=0&&sc<=100)) return 'คะแนนความเสี่ยงต้องอยู่ระหว่าง 0–100';
+  if(!['morning','afternoon'].includes(r.period)) return 'ช่วงเวลาต้องเป็น morning หรือ afternoon';
+  const age=Math.round(Number(r.age)); if(!(age>=60&&age<=110)) return 'อายุต้องอยู่ระหว่าง 60–110 ปี';
+  const sex=String(r.sex).toUpperCase(); if(!['F','M'].includes(sex)) return 'เพศต้องเป็น F หรือ M';
+  const proc=String(r.proc||'').trim(); if(!proc) return 'ต้องระบุหัตถการ';
+  const idn=id.toUpperCase().startsWith('P')?id.toUpperCase():'P'+id.padStart(4,'0');
+  if(all().some(a=>a.id===idn&&a.date===date)) return 'มีนัดของรหัสนี้ในวันเดียวกันแล้ว';
+  return {id:idn,date,period:r.period,age,sex,proc,p:sc/100,reasons:[]};
 }
-document.querySelectorAll('nav.tabs button').forEach(b=>b.onclick=()=>{
-  document.querySelectorAll('nav.tabs button').forEach(x=>x.setAttribute('aria-selected',x===b));
-  const q = b.id==='tab-q'; $('#v-q').hidden=!q; $('#v-m').hidden=q; if(!q) $('#v-m').style.display='flex'; });
-renderSum(); renderQueue(); renderPanel(); renderModel();
-const first = D.appts.find(a=>a.level==='high'); if(first){sel=key(first);renderQueue();renderPanel();}
+function msg(el,html,cls){$(el).innerHTML=`<p class="msg ${cls}" role="status">${html}</p>`;}
+$('#f-date').value=D.appts[0]?D.appts[0].date:'';
+$('#f-add').onclick=()=>{
+  const r=mkAppt({id:$('#f-id').value,date:$('#f-date').value,period:$('#f-period').value,proc:$('#f-proc').value,age:$('#f-age').value,sex:$('#f-sex').value,score:$('#f-score').value});
+  if(typeof r==='string') return msg('#f-msg',esc(r),'err');
+  S.added.push(r);save();msg('#f-msg',`เพิ่ม ${esc(r.id)} เข้าคิวแล้ว (${LV[lvl(r)]})`,'ok');$('#f-id').value='';refresh();
+};
+function parseCSV(t){
+  const lines=t.replace(/^\uFEFF/,'').split(/\r?\n/).map(l=>l.trim()).filter(Boolean); if(lines.length<2) return {err:'ไม่พบข้อมูล ต้องมีบรรทัดหัวตารางและอย่างน้อย 1 แถว'};
+  const h=lines[0].split(',').map(x=>x.trim().toLowerCase()), need=['patient_id','appt_date','period','procedure','age','sex','risk_score'];
+  const miss=need.filter(n=>!h.includes(n)); if(miss.length) return {err:'ขาดคอลัมน์: '+miss.join(', ')};
+  return {rows:lines.slice(1).map(l=>{const c=l.split(',').map(x=>x.trim());const g=n=>c[h.indexOf(n)];return {id:g('patient_id'),date:g('appt_date'),period:g('period'),proc:g('procedure'),age:g('age'),sex:g('sex'),score:g('risk_score')};})};
+}
+$('#c-file').onchange=e=>{const f=e.target.files[0]; if(!f) return; const fr=new FileReader(); fr.onload=()=>{$('#c-text').value=fr.result;}; fr.readAsText(f);};
+$('#c-go').onclick=()=>{
+  const p=parseCSV($('#c-text').value); if(p.err) return msg('#c-msg',esc(p.err),'err');
+  let ok=0; const bad=[];
+  p.rows.forEach((r,i)=>{const a=mkAppt(r); if(typeof a==='string') bad.push(`แถว ${i+2}: ${a}`); else {S.added.push(a);ok++;}});
+  save(); refresh();
+  msg('#c-msg',`นำเข้าสำเร็จ ${ok} แถว${bad.length?` · ข้าม ${bad.length} แถว<br>`+bad.slice(0,5).map(esc).join('<br>')+(bad.length>5?'<br>…':''):''}`,bad.length&&!ok?'err':'ok');
+};
+$('#c-clear').onclick=()=>{S.added=[];save();refresh();msg('#c-msg','ล้างนัดที่นำเข้าแล้ว เหลือเฉพาะข้อมูลตัวอย่าง','ok');};
+
+// ---- ตั้งค่า/โมเดล (แอดมิน) ----
+function renderAdmin(){
+  $('#cut-high').value=S.cut.high; $('#cut-low').value=S.cut.low;
+  const c={high:0,medium:0,low:0}; all().forEach(a=>c[lvl(a)]++);
+  $('#cut-sum').innerHTML=['high','medium','low'].map(l=>`<div class="${l}"><i class="dot"></i>${LV[l]} ${c[l]} นัด</div>`).join('');
+  const o={high:[0,0],medium:[0,0],low:[0,0]}; all().forEach(a=>{const v=S.outcome[key(a)]; if(v){o[lvl(a)][0]++; if(v==='noshow')o[lvl(a)][1]++;}});
+  const tot=Object.values(o).reduce((s,x)=>s+x[0],0);
+  $('#outc-sum').innerHTML = tot? ['high','medium','low'].map(l=>`<div class="${l}"><div style="display:flex;justify-content:space-between"><span><i class="dot"></i>${LV[l]} · บันทึกแล้ว ${o[l][0]}</span><b style="font-family:var(--mono)">${o[l][0]?Math.round(o[l][1]/o[l][0]*100)+'%':'—'}</b></div></div>`).join('')+'<p class="note">ตัวเลขคืออัตราขาดนัดจริงจากที่บันทึก</p>' : '<p class="note">ยังไม่มีการบันทึกผล เจ้าหน้าที่บันทึกได้ในแผงรายละเอียดผู้ป่วย</p>';
+  const m=D.metrics,p=v=>v.toFixed(2);
+  $('#nsplit').textContent=`ฝึก ${D.n.train} นัด (ปี 2566–67) · ทดสอบ ${D.n.test} นัด (ปี 2568) · RF + SMOTE`;
+  $('#mets').innerHTML=[['AUC',m.auc],['PR-AUC',m.pr_auc],['Recall',m.recall],['Precision',m.precision],['F1',m.f1],['Accuracy',m.accuracy]].map(([k,v])=>`<div><div class="v">${p(v)}</div><div class="k">${k}</div></div>`).join('');
+  $('#risk3').innerHTML=['high','medium','low'].map(l=>{const r=D.risk[l];return `<div class="${l}"><div style="display:flex;justify-content:space-between;gap:8px"><span><i class="dot"></i>${LV[l]} · ${r.n} นัด</span><b style="font-family:var(--mono)">${(r.noshow_rate*100).toFixed(1)}%</b></div><div class="gauge" style="margin-top:4px"><i style="width:${Math.min(100,r.noshow_rate*100*2.5)}%"></i></div></div>`}).join('');
+  const NM={procedure:'ประเภทหัตถการ',sex:'เพศ',prior_noshows:'จำนวนครั้งที่เคยขาดนัด',prior_noshow_rate:'อัตราขาดนัดสะสม',marital:'สถานภาพสมรส',period:'ช่วงเวลานัด',age:'อายุ',out_area:'ที่พักนอกเขต',lead_days:'นัดล่วงหน้า (วัน)',scheme:'สิทธิการรักษา',dow:'วันในสัปดาห์',chronic_disease:'โรคเรื้อรัง'};
+  const GN={Predisposing:'ปัจจัยพื้นฐาน',Enabling:'ปัจจัยเอื้ออำนวย',Need:'ปัจจัยความจำเป็น'};
+  $('#legend').innerHTML=Object.keys(GN).map(g=>`<span style="--c:var(--${g==='Predisposing'?'accent':g==='Enabling'?'mid':'lo'})">${GN[g]}</span>`).join('');
+  const imp=[...D.imp].sort((a,b)=>b.pm-a.pm).slice(0,10), mp=Math.max(...imp.map(i=>Math.max(i.pm,0)),1e-9), mg=Math.max(...imp.map(i=>i.g));
+  $('#imp').innerHTML=imp.map(i=>`<div class="bar"><span>${NM[i.f]||i.f}</span><div><div class="track"><div class="fill g-${i.grp}" style="width:${Math.max(0,i.pm)/mp*100}%"></div></div><div class="track" style="margin-top:3px;height:8px;opacity:.55"><div class="fill g-${i.grp}" style="width:${i.g/mg*100}%"></div></div></div><span class="num">${i.pm.toFixed(3)}</span></div>`).join('');
+}
+function setCut(){const h=Math.round(Number($('#cut-high').value)),l=Math.round(Number($('#cut-low').value)); if(h>=1&&h<=100&&l>=0&&l<h){S.cut={low:l,high:h};save();refresh();}}
+$('#cut-high').onchange=setCut; $('#cut-low').onchange=setCut;
+$('#cut-reset').onclick=()=>{S.cut={...DEF_CUT};save();refresh();};
+
+function refresh(){renderSum();renderQueue();renderPanel();if(tab==='m')renderAdmin();}
+renderTabs(); refresh();
+const first=all().find(a=>lvl(a)==='high'); if(first){sel=key(first);refresh();}
 </script>
