@@ -3,8 +3,15 @@
 const { verifySignature, readRaw } = require('../lib/line');
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).end();
+  const secret = process.env.LINE_CHANNEL_SECRET;
+  if (!secret) { console.error('LINE_CHANNEL_SECRET is not set (add it in Vercel env vars, then Redeploy)'); return res.status(500).json({ error: 'secret not configured' }); }
   const raw = await readRaw(req);
-  if (!verifySignature(raw, req.headers['x-line-signature'], process.env.LINE_CHANNEL_SECRET)) return res.status(401).end();
+  const sig = req.headers['x-line-signature'];
+  if (!verifySignature(raw, sig, secret)) {
+    // ไม่บันทึกค่า secret หรือเนื้อหา เฉพาะข้อมูลวินิจฉัย
+    console.error('signature mismatch', { hasSignature: !!sig, rawBytes: raw.length, secretLength: secret.length });
+    return res.status(401).json({ error: 'invalid signature' });
+  }
   const events = (JSON.parse(raw.toString('utf8')).events) || [];
   const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
   for (const e of events) {

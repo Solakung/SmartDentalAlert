@@ -12,5 +12,5 @@ const verifySignature = (raw, sig, secret) => {
   const a = Buffer.from(h), b = Buffer.from(sig);
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 };
-const readRaw = async (req) => { const c = []; for await (const x of req) c.push(Buffer.from(x)); return Buffer.concat(c); };
+const readRaw = async (req) => { if (Buffer.isBuffer(req.rawBody)) return req.rawBody; const c = []; for await (const x of req) c.push(Buffer.from(x)); return Buffer.concat(c); };
 module.exports = { push, verifySignature, readRaw };
