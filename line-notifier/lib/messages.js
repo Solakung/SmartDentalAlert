@@ -21,4 +21,17 @@ function staffSummary(date, appts) {
   return text(`สรุปนัดทันตกรรม ${fmtDay(date)}\nทั้งหมด ${day.length} นัด · สูง ${c.high} · กลาง ${c.medium} · ต่ำ ${c.low}\n` +
     (hi.length ? 'ต้องตามเป็นพิเศษ:\n' + hi.map((x) => `• ${x.id} ${x.proc} (${x.period === 'morning' ? 'เช้า' : 'บ่าย'})`).join('\n') : 'ไม่มีนัดเสี่ยงสูง'));
 }
-module.exports = { patientMessage, caregiverMessage, staffSummary };
+
+// ---- แม่แบบ 6 แบบ (ตรงกับแท็บ "ข้อความ LINE (จำลอง)" ในแอป) ----
+// name = ชื่อที่ดึงจาก LINE profile ตอนส่ง (ไม่เก็บในระบบ)  ข้อความถึงผู้ดูแล/อสม. ไม่ระบุระดับความเสี่ยง
+const longDay = (iso) => new Date(iso + 'T00:00:00').toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' });
+const slotText = (p) => (p === 'morning' ? 'ช่วงเช้า (08.30–12.00 น.)' : 'ช่วงบ่าย');
+const T = {
+  low: (a, n) => [`🦷 ${FACILITY}\nสวัสดีค่ะ คุณ${n} 💚\nระบบตรวจสอบแล้วพบว่าคุณมีนัดตรวจฟันในวันที่ ${longDay(a.date)} ${slotText(a.period)}\nขอบคุณที่ดูแลสุขภาพช่องปากอย่างต่อเนื่องนะคะ\nแล้วพบกันที่ ${FACILITY} นะคะ 😊`],
+  mediumPatient: (a, n) => `🦷 ${FACILITY}\nสวัสดีค่ะ คุณ${n} 💛\nคุณมีนัดทันตกรรมกับ ${FACILITY}\n📅 วันที่ ${longDay(a.date)} ${slotText(a.period)}\nระบบพบว่าคุณอาจมีอุปสรรคบางอย่างในการมาตามนัด เช่น การเดินทางหรือภาระงาน\nเจ้าหน้าที่จะติดต่อประสานงานกับทางผู้ดูแลเพื่อช่วยเหลือนะคะ\nกรุณาเตรียมตัวไว้ล่วงหน้า และอย่าลืมพกบัตรนัดมาด้วยค่ะ 😊`,
+  mediumCaregiver: (a, n) => `⚠️ แจ้งเตือนจาก Smart Dental Alert\nผู้ป่วย คุณ${n} มีนัดทันตกรรม\n📅 ${longDay(a.date)} ${slotText(a.period)}\nขอความร่วมมือผู้ดูแลช่วยยืนยันการเดินทางและเตรียมพาผู้ป่วยมาตามกำหนด\nหากมาไม่ได้โปรดแจ้ง ${FACILITY}`,
+  highPatientBefore: (a, n) => `🦷 ${FACILITY}\n🔴 คุณ${n} มีความเสี่ยงสูงที่จะขาดนัด\nเจ้าหน้าที่จะประสานงานกับ อสม. เพื่อช่วยให้คุณมารับบริการในวันที่ ${longDay(a.date)} ${slotText(a.period)}\nกรุณาเตรียมตัวให้พร้อมและอยู่บ้านในเวลานัดหมาย\nหากมีเหตุจำเป็นไม่สามารถมาได้ โปรดแจ้งผ่านช่องนี้ทันทีนะคะ 🙏`,
+  highPatientDay: (a) => `🦷 ${FACILITY}\n🚗 อสม. กำลังเดินทางไปรับคุณที่บ้าน เพื่อไปพบทันตบุคลากรตามนัด\nวันที่ ${longDay(a.date)} ${slotText(a.period)}\nกรุณาเตรียมบัตรนัดและของใช้ส่วนตัวให้พร้อมค่ะ`,   // ส่งหลัง อสม. กดยืนยันออกเดินทางเท่านั้น
+  highVolunteer: (a, n) => `🚨 แจ้งเตือนจาก Smart Dental Alert\nผู้ป่วย คุณ${n} ต้องการความช่วยเหลือในการมารับบริการ\nระบบได้แจ้งผู้ป่วยให้เตรียมตัวรอแล้ว\nโปรดเตรียมออกปฏิบัติงานก่อนเวลานัด และบันทึกผลการรับ–ส่งกลับระบบเมื่อเสร็จสิ้นภารกิจ`,
+};
+module.exports = { patientMessage, caregiverMessage, staffSummary, templates: T };

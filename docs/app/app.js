@@ -149,6 +149,23 @@ function renderDash() {
     <h2 style="margin-top:18px">สัดส่วนเสี่ยงสูงตามหัตถการ</h2>${Object.entries(byProc).map(([k, x]) => `<div class="bar"><span>${PROC_TH[k]}</span><div class="track"><div class="fill" style="width:${pct(x.high, x.n)}%;background:var(--hi)"></div></div><span class="num">${pct(x.high, x.n)}%</span></div>`).join('')}</div></div>`;
 }
 
+// ---------- ข้อความ LINE (จำลอง) ----------
+const FAC = () => (settings.facility && settings.facility.name) || 'รพ.สต.';
+const NAME = '‹ชื่อใน LINE›';   // ตอนส่งจริงดึงจาก LINE profile ไม่เก็บในระบบ
+function lineMsgs(a, L) {
+  const D = new Date(a.date + 'T00:00:00').toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' }), T = a.period === 'morning' ? 'ช่วงเช้า (08.30–12.00 น.)' : 'ช่วงบ่าย', F = FAC();
+  if (L === 'low') return [{ to: 'ผู้ป่วย', when: 'ก่อนวันนัด', t: `🦷 ${F}\nสวัสดีค่ะ คุณ${NAME} 💚\nระบบตรวจสอบแล้วพบว่าคุณมีนัดตรวจฟันในวันที่ ${D} ${T}\nขอบคุณที่ดูแลสุขภาพช่องปากอย่างต่อเนื่องนะคะ\nแล้วพบกันที่ ${F} นะคะ 😊` }];
+  if (L === 'medium') return [
+    { to: 'ผู้ป่วย', when: 'ก่อนวันนัด', t: `🦷 ${F}\nสวัสดีค่ะ คุณ${NAME} 💛\nคุณมีนัดทันตกรรมกับ ${F}\n📅 วันที่ ${D} ${T}\nระบบพบว่าคุณอาจมีอุปสรรคบางอย่างในการมาตามนัด เช่น การเดินทางหรือภาระงาน\nเจ้าหน้าที่จะติดต่อประสานงานกับทางผู้ดูแลเพื่อช่วยเหลือนะคะ\nกรุณาเตรียมตัวไว้ล่วงหน้า และอย่าลืมพกบัตรนัดมาด้วยค่ะ 😊` },
+    { to: 'ผู้ดูแล', when: 'ก่อนวันนัด', t: `⚠️ แจ้งเตือนจาก Smart Dental Alert\nผู้ป่วย คุณ${NAME} มีนัดทันตกรรม\n📅 ${D} ${T}\nขอความร่วมมือผู้ดูแลช่วยยืนยันการเดินทางและเตรียมพาผู้ป่วยมาตามกำหนด\nหากมาไม่ได้โปรดแจ้ง ${F}` }];
+  const go = !!(a.done && a.done.go);
+  return [
+    { to: 'ผู้ป่วย', when: 'ก่อนวันนัด 2–3 วัน', t: `🦷 ${F}\n🔴 คุณ${NAME} มีความเสี่ยงสูงที่จะขาดนัด\nเจ้าหน้าที่จะประสานงานกับ อสม. เพื่อช่วยให้คุณมารับบริการในวันที่ ${D} ${T}\nกรุณาเตรียมตัวให้พร้อมและอยู่บ้านในเวลานัดหมาย\nหากมีเหตุจำเป็นไม่สามารถมาได้ โปรดแจ้งผ่านช่องนี้ทันทีนะคะ 🙏` },
+    { to: 'ผู้ป่วย', when: 'วันนัด · ส่งหลัง อสม. กดออกเดินทาง', lock: !go, t: `🦷 ${F}\n🚗 อสม. กำลังเดินทางไปรับคุณที่บ้าน เพื่อไปพบทันตบุคลากรตามนัด\nวันที่ ${D} ${T}\nกรุณาเตรียมบัตรนัดและของใช้ส่วนตัวให้พร้อมค่ะ` },
+    { to: 'อสม.', when: 'วันนัด', t: `🚨 แจ้งเตือนจาก Smart Dental Alert\nผู้ป่วย คุณ${NAME} ต้องการความช่วยเหลือในการมารับบริการ\nระบบได้แจ้งผู้ป่วยให้เตรียมตัวรอแล้ว\nโปรดเตรียมออกปฏิบัติงานก่อนเวลานัด และบันทึกผลการรับ–ส่งกลับระบบเมื่อเสร็จสิ้นภารกิจ` }];
+}
+const bubbleHtml = m => `<div class="lm${m.lock ? ' lock' : ''}"><div class="lm-h"><b>ถึง${m.to}</b> · ${m.when}${m.lock ? ' · ยังไม่ส่ง' : ''}</div><div class="bubble">${esc(m.t).replace(esc(NAME), '<mark>' + esc(NAME) + '</mark>')}</div></div>`;
+
 // ---------- คิวนัด ----------
 const dates = () => [...new Set(appts.map(a => a.date))].sort();
 function defaultDate() { const d = dates(), today = new Date().toISOString().slice(0, 10); return d.find(x => x >= today) || d[d.length - 1] || ''; }
@@ -180,10 +197,11 @@ function renderPanel() {
     <div><p class="sec">คะแนนความเสี่ยง</p><div class="gauge"><i style="width:${Math.min(100, score(a) * 1.6)}%"></i></div><p class="note" style="margin-top:4px">${score(a)} / 100 · สูง ≥ ${c.high} · ต่ำ &lt; ${c.low}</p></div>
     <div><p class="sec">ปัจจัยที่ทำให้เสี่ยง (กรอบ Andersen)</p>${explain(a).filter(x => x.d > 0.005).slice(0, 3).map(x => `<div class="act" style="align-items:flex-start"><span class="tag">${GRP_TH[x.f.grp]}</span><span><b>${x.f.label}</b> · ${esc(x.f.txt(a))}</span></div>`).join('') || '<p class="note">ไม่มีปัจจัยเด่น</p>'}</div>
     <div><p class="sec">มาตรการที่แนะนำ</p>${ACTIONS[L].map((t, i) => `<div class="act"><input type="checkbox" id="a${i}" data-i="${i}" ${done[i] ? 'checked' : ''}><label for="a${i}">${t}</label></div>`).join('')}</div>
+    <div><p class="sec">ข้อความ LINE (จำลอง ยังไม่ส่งจริง)</p>${lineMsgs(a, L).map(bubbleHtml).join('')}${L === 'high' ? `<div class="act"><input type="checkbox" id="go" ${done.go ? 'checked' : ''}><label for="go">อสม. ออกเดินทางแล้ว</label></div>` : ''}</div>
     <div><p class="sec">ผลการมารับบริการ</p><div class="outc"><button data-o="came" aria-pressed="${a.outcome === 'came'}">มาตามนัด</button><button data-o="noshow" aria-pressed="${a.outcome === 'noshow'}">ขาดนัด</button></div></div>
     <p id="p-err"></p>`;
   const fail = () => { $('#p-err').innerHTML = '<p class="msg err" role="alert">บันทึกไม่สำเร็จ ตรวจสิทธิ์หรืออินเทอร์เน็ตแล้วลองใหม่</p>'; };
-  P.querySelectorAll('input[type=checkbox]').forEach(x => x.onchange = () => DB.setDone(a._id, x.dataset.i, x.checked, me.email).catch(fail));
+  P.querySelectorAll('input[type=checkbox]').forEach(x => x.onchange = () => DB.setDone(a._id, x.id === 'go' ? 'go' : x.dataset.i, x.checked, me.email).catch(fail));
   P.querySelectorAll('.outc button').forEach(b => b.onclick = () => DB.setOutcome(a._id, a.outcome === b.dataset.o ? null : b.dataset.o, me.email).catch(fail));
 }
 
