@@ -239,8 +239,12 @@ function renderAdd() {
 function renderImport() {
   const v = $('#v-i'); if (!v) return;
   v.innerHTML = `<div class="card"><h2>นำเข้าจากไฟล์ CSV</h2><div class="form" style="grid-template-columns:1fr"><label>เลือกไฟล์ .csv<input type="file" id="c-file" accept=".csv,text/csv"></label><label>หรือวางข้อความ CSV<textarea id="c-text"></textarea></label></div>
-    <div class="btns"><button class="btn" id="c-go">นำเข้า</button><button class="btn sec2" id="c-clear">${clearArmed ? 'กดอีกครั้งเพื่อยืนยันลบนัดทั้งหมด' : 'ลบนัดทั้งหมด'}</button></div><div id="c-msg"></div></div>`;
+    <div class="btns"><button class="btn" id="c-go">นำเข้า</button><button class="btn sec2" id="c-demo">โหลดข้อมูลจำลอง 40 นัด</button><button class="btn sec2" id="c-clear">${clearArmed ? 'กดอีกครั้งเพื่อยืนยันลบนัดทั้งหมด' : 'ลบนัดทั้งหมด'}</button></div><div id="c-msg"></div></div>`;
   $('#c-file').onchange = e => { const f = e.target.files[0]; if (!f) return; const fr = new FileReader(); fr.onload = () => { $('#c-text').value = fr.result; }; fr.readAsText(f); };
+  $('#c-demo').onclick = async () => {
+    try { const rows = await (await fetch('demo.json')).json(), days = []; const d = new Date();
+      while (days.length < 10) { if (d.getDay() % 6) days.push(d.toISOString().slice(0, 10)); d.setDate(d.getDate() + 1); }
+      importList(rows.map(r => ({ ...r, date: days[r.day] })), '#c-msg'); } catch (e) { msg('#c-msg', 'โหลดข้อมูลจำลองไม่สำเร็จ', 'err'); } };
   $('#c-go').onclick = () => { const p = parseCSV($('#c-text').value); if (p.err) return msg('#c-msg', esc(p.err), 'err'); importList(p.rows, '#c-msg'); };
   $('#c-clear').onclick = async () => {
     if (!clearArmed) { clearArmed = true; return renderImport(); }
