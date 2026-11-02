@@ -169,3 +169,6 @@ data_real/
 model.joblib
 run_log.txt
 mockup_artifact.html
+
+# โค้ดของ line-notifier อยู่ใน lib/ ต้องไม่ถูก ignore
+!line-notifier/lib/
