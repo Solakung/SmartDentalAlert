@@ -35,3 +35,6 @@ python3 build_mockup.py      # สร้าง docs/index.html จากผล�
 3. ตัวชี้วัด: Accuracy, Precision, Recall, F1, AUC, PR-AUC, Brier
 4. ความสำคัญของตัวแปร: Gini และ Permutation จัดกลุ่มตาม Andersen
 5. จุดตัดความเสี่ยง 3 ระดับจากชุด Validation
+
+## ใช้กับหลายหน่วยบริการ
+ชื่อหน่วยบริการตั้งได้ผ่านตัวแปร `FACILITY_NAME` (ทั้ง `line-notifier` และ `build_mockup.py`) ข้อมูลเตาถ่านใช้เป็นชุดฝึกของโมเดลเท่านั้น หน่วยบริการอื่นควรตรวจสอบประสิทธิภาพและฝึกโมเดลใหม่ด้วยข้อมูลของตัวเองก่อนใช้งาน

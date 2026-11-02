@@ -1,12 +1,13 @@
 // แม่แบบข้อความ 3 กลุ่มผู้รับ (ตรงกับแท็บ "ข้อความ LINE" ใน mock-up)
 // ข้อความถึงผู้ป่วยไม่แสดงระดับความเสี่ยง
+const FACILITY = process.env.FACILITY_NAME || 'รพ.สต.'; // ตั้งใน Vercel ต่อหน่วยบริการ
 const SLOT = { morning: 'ช่วงเช้า', afternoon: 'ช่วงบ่าย' };
 const fmtDay = (iso) => new Date(iso + 'T00:00:00').toLocaleDateString('th-TH', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' });
 const quick = (labels) => ({ items: labels.map((l) => ({ type: 'action', action: { type: 'postback', label: l, data: 'a=' + encodeURIComponent(l), displayText: l } })) });
 const text = (t, labels) => ({ type: 'text', text: t, ...(labels ? { quickReply: quick(labels) } : {}) });
 
 function patientMessage(a) {
-  return text(`รพ.สต.บ้านเตาถ่าน แจ้งนัดทันตกรรม\n${fmtDay(a.date)}\n${SLOT[a.period]} · ${a.proc}\nกรุณามาตามนัด หากไม่สะดวกกดขอเลื่อนนัดได้`, ['ยืนยันว่าจะมา', 'ขอเลื่อนนัด']);
+  return text(`${FACILITY} แจ้งนัดทันตกรรม\n${fmtDay(a.date)}\n${SLOT[a.period]} · ${a.proc}\nกรุณามาตามนัด หากไม่สะดวกกดขอเลื่อนนัดได้`, ['ยืนยันว่าจะมา', 'ขอเลื่อนนัด']);
 }
 function caregiverMessage(a, level) {
   if (level === 'high') return text(`ขอความร่วมมือเตือนและช่วยพาผู้ป่วยรหัส ${a.id} มารับบริการทันตกรรม\n${fmtDay(a.date)} ${SLOT[a.period]}\nหากเดินทางลำบาก แจ้ง รพ.สต. เพื่อประสานรถรับส่ง`, ['รับทราบ', 'ต้องการรถรับส่ง']);

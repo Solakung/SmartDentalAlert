@@ -19,7 +19,9 @@ rows = [dict(id=f"P{int(r.patient_id):04d}", date=r.appt_date.strftime("%Y-%m-%d
         for _, r in s.sort_values(["appt_date","period"]).iterrows()]
 data = dict(appts=rows, cut=res["risk_cutoffs"], metrics=res["models"]["RF + SMOTE (ตามโครงร่าง)"], risk=res["risk_table"], n=res["n"],
             imp=[dict(f=d["feature"], g=d["gini"], pm=d["permutation_auc_drop"], grp=d["andersen_group"]) for d in res["importance"]])
-html = open("mockup_template.html").read().replace("__DATA__", json.dumps(data, ensure_ascii=False))
+import os
+FACILITY = os.environ.get("FACILITY_NAME", "รพ.สต.บ้านเตาถ่าน")   # ชื่อหน่วยบริการในหน้าสาธิต
+html = open("mockup_template.html").read().replace("__DATA__", json.dumps(data, ensure_ascii=False)).replace("__FACILITY__", FACILITY)
 # docs/index.html เปิดตรงๆ (GitHub Pages) จึงต้องมี doctype/charset/viewport/กฎ [hidden] ครบ
 i = html.index('<div class="wrap">')
 page = ('<!doctype html>\n<html lang="th">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">\n'

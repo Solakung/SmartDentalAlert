@@ -116,7 +116,7 @@ code.block{display:block;white-space:pre;overflow-x:auto;background:var(--surfac
 <header>
   <div>
     <h1>ระบบเตือนนัดทันตกรรม ผู้สูงอายุ</h1>
-    <p class="sub">ภาพจำลองระบบสนับสนุนการตัดสินใจเชิงรุก · รพ.สต.บ้านเตาถ่าน</p>
+    <p class="sub">ภาพจำลองระบบสนับสนุนการตัดสินใจเชิงรุก · __FACILITY__</p>
   </div>
   <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
     <div class="seg" role="group" aria-label="บทบาทผู้ใช้"><button id="r-staff" aria-pressed="true">เจ้าหน้าที่</button><button id="r-admin" aria-pressed="false">แอดมิน</button></div>
@@ -363,7 +363,7 @@ function renderLine(){
   const hi=day_.filter(x=>lvl(x)==='high').slice(0,5);
   const box=(t,why,body)=>`<div class="chat"><h3>${t}</h3><p class="why">${why}</p>${body}</div>`;
   const msg=(txt,btns)=>`<div class="bub">${esc(txt)}</div><div class="qr">${btns.map(b=>`<span>${b}</span>`).join('')}</div>`;
-  const pat=box('ผู้ป่วย','ส่งทุกระดับ 1–3 วันก่อนนัด',msg(`รพ.สต.บ้านเตาถ่าน แจ้งนัดทันตกรรม\n${day}\n${slot} · ${a.proc}\nกรุณามาตามนัด หากไม่สะดวกกดขอเลื่อนนัดได้`,['ยืนยันว่าจะมา','ขอเลื่อนนัด']));
+  const pat=box('ผู้ป่วย','ส่งทุกระดับ 1–3 วันก่อนนัด',msg(`__FACILITY__ แจ้งนัดทันตกรรม\n${day}\n${slot} · ${a.proc}\nกรุณามาตามนัด หากไม่สะดวกกดขอเลื่อนนัดได้`,['ยืนยันว่าจะมา','ขอเลื่อนนัด']));
   const cg = L==='high' ? box('อสม. / ผู้ดูแล','เสี่ยงสูง ส่งก่อนนัด 2–3 วัน',msg(`ขอความร่วมมือเตือนและช่วยพาผู้ป่วยรหัส ${a.id} มารับบริการทันตกรรม\n${day} ${slot}\nหากเดินทางลำบาก แจ้ง รพ.สต. เพื่อประสานรถรับส่ง`,['รับทราบ','ต้องการรถรับส่ง']))
     : L==='medium' ? box('อสม. / ผู้ดูแล','เสี่ยงปานกลาง ส่งก่อนนัด 2–3 วัน',msg(`ขอให้ช่วยยืนยันการเดินทางของผู้ป่วยรหัส ${a.id}\nนัดทันตกรรม ${day} ${slot}`,['ยืนยันแล้ว','ไม่สะดวก']))
     : box('อสม. / ผู้ดูแล','เสี่ยงต่ำ ไม่ส่งข้อความถึงกลุ่มนี้','<div class="skip">นัดนี้ได้รับเฉพาะข้อความเตือนอัตโนมัติถึงผู้ป่วย</div>');

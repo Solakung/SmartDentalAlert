@@ -17,7 +17,7 @@ module.exports = async (req, res) => {
   for (const e of events) {
     if (e.type === 'follow' && e.replyToken && token) {
       await fetch('https://api.line.me/v2/bot/message/reply', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-        body: JSON.stringify({ replyToken: e.replyToken, messages: [{ type: 'text', text: 'ขอบคุณที่เพิ่มเพื่อน รพ.สต.บ้านเตาถ่าน\nกรุณาแจ้งเจ้าหน้าที่เพื่อลงทะเบียนรับการแจ้งเตือน' }] }) });
+        body: JSON.stringify({ replyToken: e.replyToken, messages: [{ type: 'text', text: `ขอบคุณที่เพิ่มเพื่อน ${process.env.FACILITY_NAME || 'รพ.สต.'}\nกรุณาแจ้งเจ้าหน้าที่เพื่อลงทะเบียนรับการแจ้งเตือน` }] }) });
     }
     // postback ยืนยัน/ขอเลื่อน: ต่อยอดเก็บเป็นผลการนัด (ยังไม่ทำ)
   }
