@@ -67,19 +67,19 @@ const PROCS = ['ขูดหินปูน', 'ถอนฟัน', 'อุด�
 function renderShell() {
   const root = $('#app');
   if (!me) {
-    root.innerHTML = `<div class="login"><div><h1>Smart Dental Alert</h1><p class="sub">ระบบเตือนนัดทันตกรรมผู้สูงอายุ · เข้าสู่ระบบสำหรับเจ้าหน้าที่</p></div>
-      ${DB.demo ? '<p class="banner">โหมดสาธิต ยังไม่ได้ตั้งค่า Firebase ข้อมูลอยู่ในหน่วยความจำและหายเมื่อรีเฟรช ไม่มีความปลอดภัยจริง<br>ใส่อีเมลใดก็ได้ ขึ้นต้นด้วย admin จะเป็นแอดมิน</p>' : ''}
+    root.innerHTML = `<div class="login"><div><h1>Smart Dental Alert</h1></div>
+      ${DB.demo ? '<p class="banner">โหมดสาธิต</p>' : ''}
       <div class="card"><div class="form" style="grid-template-columns:1fr"><label>อีเมล<input type="text" id="lg-email" autocomplete="username" inputmode="email"></label>
       <label>รหัสผ่าน<input type="password" id="lg-pw" autocomplete="current-password"></label></div>
       <div class="btns"><button class="btn" id="lg-go">เข้าสู่ระบบ</button></div>${authMsg ? `<p class="msg err" role="alert">${esc(authMsg)}</p>` : ''}</div>
-      <p class="note">บัญชีสร้างโดยแอดมินเท่านั้น ไม่มีการสมัครเอง</p></div>`;
+      </div>`;
     const go = async () => { authMsg = ''; try { await DB.login($('#lg-email').value.trim(), $('#lg-pw').value); } catch (e) { authMsg = /invalid|wrong|user-not-found|credential/i.test(e.code + e.message) ? 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' : 'เข้าสู่ระบบไม่สำเร็จ ลองใหม่อีกครั้ง'; renderShell(); } };
     $('#lg-go').onclick = go; $('#lg-pw').onkeydown = e => { if (e.key === 'Enter') go(); };
     return;
   }
   if (!me.role) {
-    root.innerHTML = `<div class="login"><h1>บัญชียังไม่ได้รับสิทธิ์</h1><p class="note">ให้แอดมินเพิ่มบัญชีนี้ในระบบ โดยสร้างเอกสาร <b>users/&lt;UID&gt;</b> ที่มีฟิลด์ <b>role</b> เป็น admin หรือ staff</p>
-      <div class="card"><p class="sec">UID ของคุณ</p><p class="mono">${esc(me.uid)}</p><p class="note">${esc(me.email)}</p></div><div class="btns"><button class="btn sec2" id="lo">ออกจากระบบ</button></div></div>`;
+    root.innerHTML = `<div class="login"><h1>บัญชียังไม่ได้รับสิทธิ์</h1><p class="note">ติดต่อแอดมินเพื่อขอสิทธิ์</p>
+      <div class="card"><p class="sec">UID</p><p class="mono">${esc(me.uid)}</p><p class="note">${esc(me.email)}</p></div><div class="btns"><button class="btn sec2" id="lo">ออกจากระบบ</button></div></div>`;
     $('#lo').onclick = () => DB.logout(); return;
   }
   const tabs = isAdmin() ? [['q', 'คิวนัดหมาย'], ['i', 'นำเข้านัดหมาย'], ['m', 'จุดตัดและโมเดล']] : [['q', 'คิวนัดหมาย']];
@@ -89,7 +89,7 @@ function renderShell() {
     <nav class="tabs" role="tablist">${tabs.map(([k, l]) => `<button role="tab" data-t="${k}" aria-selected="${tab === k}">${l}</button>`).join('')}</nav>
     <section id="v-q" ${tab === 'q' ? '' : 'hidden'} style="display:flex;flex-direction:column;gap:18px"></section>
     <section id="v-i" ${tab === 'i' ? '' : 'hidden'}></section><section id="v-m" ${tab === 'm' ? '' : 'hidden'}></section>
-    <p class="footer">ใช้รหัสวิจัยเท่านั้น ห้ามบันทึกชื่อหรือเลขบัตรประชาชนในระบบนี้</p>`;
+    `;
   $('#lo').onclick = () => DB.logout();
   document.querySelectorAll('nav.tabs button').forEach(b => b.onclick = () => { tab = b.dataset.t; renderShell(); renderTab(); });
   renderTab();
@@ -101,7 +101,7 @@ const dates = () => [...new Set(appts.map(a => a.date))].sort();
 function defaultDate() { const d = dates(), today = new Date().toISOString().slice(0, 10); return d.find(x => x >= today) || d[d.length - 1] || ''; }
 function renderQueueView() {
   const v = $('#v-q'); if (!v) return;
-  if (!appts.length) { v.innerHTML = `<div class="card"><h2>ยังไม่มีนัดในระบบ</h2><p class="note">${isAdmin() ? 'ไปที่แท็บ "นำเข้านัดหมาย" เพื่อเพิ่มนัดหรืออัปโหลดไฟล์ CSV ที่ได้จาก score_new.py' : 'ให้แอดมินนำเข้านัดหมายก่อน'}</p></div>`; return; }
+  if (!appts.length) { v.innerHTML = `<div class="card"><h2>ยังไม่มีนัดในระบบ</h2><p class="note">${isAdmin() ? 'นำเข้าที่แท็บ "นำเข้านัดหมาย"' : ''}</p></div>`; return; }
   if (filterDate !== 'all' && !dates().includes(filterDate)) filterDate = defaultDate();
   const inDay = appts.filter(a => filterDate === 'all' || a.date === filterDate), c = { high: 0, medium: 0, low: 0 }; inDay.forEach(a => c[lvl(a)]++);
   v.innerHTML = `<div class="form" style="grid-template-columns:minmax(0,320px);margin:0"><label>วันที่นัด<select id="q-date"><option value="all">ทุกวัน</option>${dates().map(d => `<option value="${d}">${fmtDay(d)}</option>`).join('')}</select></label></div>
@@ -120,15 +120,15 @@ function renderQueueView() {
 }
 function renderPanel() {
   const P = $('#panel'); if (!P) return; const a = appts.find(x => x._id === sel);
-  if (!a) { P.className = 'panel'; P.innerHTML = '<h2>เลือกผู้ป่วยจากคิวนัด</h2><p class="note">ระบบจะแสดงมาตรการติดตามที่เหมาะกับระดับความเสี่ยง</p>'; return; }
+  if (!a) { P.className = 'panel'; P.innerHTML = '<h2>เลือกผู้ป่วยจากคิวนัด</h2>'; return; }
   const L = lvl(a), c = cut(), done = a.done || {}; P.className = 'panel ' + L;
   P.innerHTML = `<div><h2><span class="mono">${esc(a.id)}</span> <span class="pill" style="margin-left:6px"><i class="dot"></i>${LV[L]}</span></h2>
     <p class="note">${fmtDay(a.date)} · ${a.period === 'morning' ? 'ช่วงเช้า' : 'ช่วงบ่าย'} · ${esc(a.proc)}</p></div>
     <div><p class="sec">คะแนนความเสี่ยง</p><div class="gauge"><i style="width:${Math.min(100, score(a) * 1.6)}%"></i></div><p class="note" style="margin-top:4px">${score(a)} / 100 · สูง ≥ ${c.high} · ต่ำ &lt; ${c.low}</p></div>
     <dl class="kv"><div><dt>อายุ / เพศ</dt><dd>${esc(a.age)} ปี · ${a.sex === 'F' ? 'หญิง' : 'ชาย'}</dd></div></dl>
     <div><p class="sec">มาตรการที่แนะนำ</p>${ACTIONS[L].map((t, i) => `<div class="act"><input type="checkbox" id="a${i}" data-i="${i}" ${done[i] ? 'checked' : ''}><label for="a${i}">${t}</label></div>`).join('')}</div>
-    <div><p class="sec">ผลการมารับบริการ (บันทึกหลังวันนัด)</p><div class="outc"><button data-o="came" aria-pressed="${a.outcome === 'came'}">มาตามนัด</button><button data-o="noshow" aria-pressed="${a.outcome === 'noshow'}">ขาดนัด</button></div></div>
-    <p class="note">ผลประเมินใช้จัดลำดับการติดตามเท่านั้น ไม่ใช้ปฏิเสธหรือตัดสิทธิ์การรักษา</p><p id="p-err"></p>`;
+    <div><p class="sec">ผลการมารับบริการ</p><div class="outc"><button data-o="came" aria-pressed="${a.outcome === 'came'}">มาตามนัด</button><button data-o="noshow" aria-pressed="${a.outcome === 'noshow'}">ขาดนัด</button></div></div>
+    <p id="p-err"></p>`;
   const fail = () => { $('#p-err').innerHTML = '<p class="msg err" role="alert">บันทึกไม่สำเร็จ ตรวจสิทธิ์หรืออินเทอร์เน็ตแล้วลองใหม่</p>'; };
   P.querySelectorAll('input[type=checkbox]').forEach(x => x.onchange = () => DB.setDone(a._id, x.dataset.i, x.checked, me.email).catch(fail));
   P.querySelectorAll('.outc button').forEach(b => b.onclick = () => DB.setOutcome(a._id, a.outcome === b.dataset.o ? null : b.dataset.o, me.email).catch(fail));
@@ -163,16 +163,15 @@ async function importList(list, el) {
 }
 function renderImport() {
   const v = $('#v-i'); if (!v) return;
-  v.innerHTML = `<div class="grid2"><div class="card"><h2>เพิ่มนัดหมายทีละราย</h2><p class="note">ใช้รหัสวิจัยเท่านั้น ห้ามกรอกชื่อหรือเลขบัตรประชาชน</p><div class="form">
+  v.innerHTML = `<div class="grid2"><div class="card"><h2>เพิ่มนัดหมายทีละราย</h2><div class="form">
     <label>รหัสผู้ป่วย<input type="text" id="f-id" placeholder="P0123" autocomplete="off"></label><label>วันที่นัด<input type="date" id="f-date"></label>
     <label>ช่วงเวลา<select id="f-period"><option value="morning">เช้า</option><option value="afternoon">บ่าย</option></select></label>
     <label>หัตถการ<select id="f-proc">${PROCS.map(p => `<option>${p}</option>`).join('')}</select></label>
     <label>อายุ (ปี)<input type="number" id="f-age" min="60" max="110" value="70"></label><label>เพศ<select id="f-sex"><option value="F">หญิง</option><option value="M">ชาย</option></select></label>
     <label>คะแนนความเสี่ยง (0–100)<input type="number" id="f-score" min="0" max="100" value="20"></label></div>
     <div class="btns"><button class="btn" id="f-add">เพิ่มเข้าคิว</button></div><div id="f-msg"></div></div>
-    <div class="card"><h2>นำเข้าหลายรายจากไฟล์ CSV</h2><p class="note">ไฟล์จาก score_new.py ใช้ได้ทันที คะแนนคำนวณจากโมเดลที่ผู้วิจัยรันแยก</p>
-    <code class="block">patient_id,appt_date,period,procedure,age,sex,risk_score
-P0123,2026-11-03,morning,ขูดหินปูน,72,F,41</code>
+    <div class="card"><h2>นำเข้าหลายรายจากไฟล์ CSV</h2>
+    
     <div class="form" style="grid-template-columns:1fr"><label>เลือกไฟล์ .csv<input type="file" id="c-file" accept=".csv,text/csv"></label><label>หรือวางข้อความ CSV<textarea id="c-text"></textarea></label></div>
     <div class="btns"><button class="btn" id="c-go">นำเข้า</button><button class="btn sec2" id="c-clear">${clearArmed ? 'กดอีกครั้งเพื่อยืนยันลบนัดทั้งหมด' : 'ลบนัดทั้งหมด'}</button></div><div id="c-msg"></div></div></div>`;
   $('#f-date').value = new Date().toISOString().slice(0, 10);
@@ -195,13 +194,13 @@ function renderAdminTab() {
   const v = $('#v-m'); if (!v) return; const c = cut(), m = settings.model, cnt = { high: 0, medium: 0, low: 0 }; appts.forEach(a => cnt[lvl(a)]++);
   const o = { high: [0, 0], medium: [0, 0], low: [0, 0] }; appts.forEach(a => { if (a.outcome) { o[lvl(a)][0]++; if (a.outcome === 'noshow') o[lvl(a)][1]++; } });
   const tot = Object.values(o).reduce((s, x) => s + x[0], 0);
-  v.innerHTML = `<div class="grid2"><div class="card"><h2>จุดตัดระดับความเสี่ยง</h2><p class="note">ใช้ค่าที่ score_new.py แจ้งหลังฝึกโมเดล</p>
+  v.innerHTML = `<div class="grid2"><div class="card"><h2>จุดตัดระดับความเสี่ยง</h2>
     <div class="cutrow"><label class="note">เสี่ยงสูงเริ่มที่คะแนน<input type="number" id="cut-high" min="1" max="100" value="${c.high}"></label><label class="note">เสี่ยงต่ำต่ำกว่าคะแนน<input type="number" id="cut-low" min="0" max="99" value="${c.low}"></label></div>
     <div class="btns"><button class="btn sm" id="cut-save">บันทึกจุดตัด</button>${m && m.cut ? '<button class="btn sec2 sm" id="cut-model">ใช้ค่าจากโมเดล</button>' : ''}</div><div id="cut-msg"></div>
     <div class="risk3" style="margin-top:10px">${['high', 'medium', 'low'].map(l => `<div class="${l}"><i class="dot"></i>${LV[l]} ${cnt[l]} นัด</div>`).join('')}</div></div>
-    <div class="card"><h2>ผลการมา/ขาดนัดที่บันทึกแล้ว</h2><p class="note">ใช้ตรวจว่าระดับความเสี่ยงตรงกับผลจริงหรือไม่</p><div class="risk3">${tot ? ['high', 'medium', 'low'].map(l => `<div class="${l}"><div style="display:flex;justify-content:space-between"><span><i class="dot"></i>${LV[l]} · บันทึกแล้ว ${o[l][0]}</span><b class="mono">${o[l][0] ? Math.round(o[l][1] / o[l][0] * 100) + '%' : '—'}</b></div></div>`).join('') : '<p class="note">ยังไม่มีการบันทึกผล</p>'}</div></div></div>
-    <div class="grid2" style="margin-top:18px"><div class="card"><h2>ชื่อหน่วยบริการ</h2><div class="form" style="grid-template-columns:1fr"><label>แสดงที่หัวหน้า<input type="text" id="fac" maxlength="60" value="${esc((settings.facility && settings.facility.name) || '')}"></label></div><div class="btns"><button class="btn sm" id="fac-save">บันทึก</button></div></div>
-    <div class="card"><h2>ผลโมเดล (results.json)</h2><p class="note">อัปโหลดไฟล์ results.json จาก train_model.py เพื่อแสดงตัวชี้วัดและความสำคัญของปัจจัย</p><div class="form" style="grid-template-columns:1fr"><label>เลือกไฟล์<input type="file" id="mdl-file" accept=".json,application/json"></label></div><div id="mdl-msg"></div></div></div>
+    <div class="card"><h2>อัตราขาดนัดตามระดับเสี่ยง</h2><div class="risk3">${tot ? ['high', 'medium', 'low'].map(l => `<div class="${l}"><div style="display:flex;justify-content:space-between"><span><i class="dot"></i>${LV[l]} · บันทึกแล้ว ${o[l][0]}</span><b class="mono">${o[l][0] ? Math.round(o[l][1] / o[l][0] * 100) + '%' : '—'}</b></div></div>`).join('') : '<p class="note">ยังไม่มีการบันทึกผล</p>'}</div></div></div>
+    <div class="grid2" style="margin-top:18px"><div class="card"><h2>ชื่อหน่วยบริการ</h2><div class="form" style="grid-template-columns:1fr"><label>ชื่อ<input type="text" id="fac" maxlength="60" value="${esc((settings.facility && settings.facility.name) || '')}"></label></div><div class="btns"><button class="btn sm" id="fac-save">บันทึก</button></div></div>
+    <div class="card"><h2>ผลโมเดล</h2><div class="form" style="grid-template-columns:1fr"><label>เลือกไฟล์<input type="file" id="mdl-file" accept=".json,application/json"></label></div><div id="mdl-msg"></div></div></div>
     ${m ? modelHtml(m) : ''}`;
   const saveCut = async (low, high) => { if (!(high >= 1 && high <= 100 && low >= 0 && low < high)) return msg('#cut-msg', 'จุดตัดไม่ถูกต้อง ค่าต่ำต้องน้อยกว่าค่าสูง', 'err'); try { await DB.setSetting('config', { low, high }); msg('#cut-msg', 'บันทึกจุดตัดแล้ว', 'ok'); } catch (e) { msg('#cut-msg', 'บันทึกไม่สำเร็จ ตรวจสิทธิ์แอดมิน', 'err'); } };
   $('#cut-save').onclick = () => saveCut(Math.round(+$('#cut-low').value), Math.round(+$('#cut-high').value));
@@ -219,7 +218,7 @@ function modelHtml(m) {
   const p = x => (+x).toFixed(2), imp = [...(m.imp || [])].sort((a, b) => b.pm - a.pm).slice(0, 10), mp = Math.max(...imp.map(i => Math.max(i.pm, 0)), 1e-9), mg = Math.max(...imp.map(i => i.g), 1e-9);
   return `<div class="card" style="margin-top:18px"><h2>ประสิทธิภาพโมเดลบนชุดทดสอบ</h2><p class="note">ฝึก ${m.n.train ?? '-'} นัด · ทดสอบ ${m.n.test ?? '-'} นัด</p>
     <div class="mets">${[['AUC', m.metrics.auc], ['PR-AUC', m.metrics.pr_auc], ['Recall', m.metrics.recall], ['Precision', m.metrics.precision], ['F1', m.metrics.f1], ['Accuracy', m.metrics.accuracy]].map(([k, v]) => `<div><div class="v">${p(v)}</div><div class="k">${k}</div></div>`).join('')}</div>
-    <h2 style="margin-top:18px">ความสำคัญของปัจจัยตามกรอบ Andersen</h2><p class="note">แถบบน = Permutation · แถบล่าง = Gini</p>
+    <h2 style="margin-top:18px">ความสำคัญของปัจจัยตามกรอบ Andersen</h2>
     ${imp.map(i => `<div class="bar"><span>${esc(NM[i.f] || i.f)}</span><div><div class="track"><div class="fill g-${esc(i.grp)}" style="width:${Math.max(0, i.pm) / mp * 100}%"></div></div><div class="track" style="margin-top:3px;height:8px;opacity:.55"><div class="fill g-${esc(i.grp)}" style="width:${i.g / mg * 100}%"></div></div></div><span class="num">${(+i.pm).toFixed(3)}</span></div>`).join('')}</div>`;
 }
 
