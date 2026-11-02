@@ -90,7 +90,7 @@ function makeDemo() {
 }
 
 // ================= สถานะ =================
-let DB, me = null, appts = [], settings = {}, tab = 'q', filterLevel = null, filterDate = '', sel = null, clearArmed = false, authMsg = '';
+let DB, me = null, appts = [], settings = {}, tab = 'd', filterLevel = null, filterDate = '', sel = null, clearArmed = false, authMsg = '';
 const cut = () => ({ ...M.cutoffs, ...(settings.config || {}) });
 const score = a => Math.round(a.p * 100);
 const lvl = a => { const v = score(a), c = cut(); return v >= c.high ? 'high' : v >= c.low ? 'medium' : 'low'; };
@@ -116,11 +116,12 @@ function renderShell() {
       <div class="card"><p class="sec">UID</p><p class="mono">${esc(me.uid)}</p><p class="note">${esc(me.email)}</p></div><div class="btns"><button class="btn sec2" id="lo">ออกจากระบบ</button></div></div>`;
     $('#lo').onclick = () => DB.logout(); return;
   }
-  const tabs = isAdmin() ? [['q', 'คิวนัดหมาย'], ['a', 'เพิ่มนัด'], ['i', 'นำเข้า CSV'], ['m', 'จุดตัดและโมเดล']] : [['q', 'คิวนัดหมาย'], ['a', 'เพิ่มนัด']];
+  const tabs = isAdmin() ? [['d', 'ภาพรวม'], ['q', 'คิวนัดหมาย'], ['a', 'เพิ่มนัด'], ['i', 'นำเข้า CSV'], ['m', 'จุดตัดและโมเดล']] : [['d', 'ภาพรวม'], ['q', 'คิวนัดหมาย'], ['a', 'เพิ่มนัด']];
   if (!tabs.some(t => t[0] === tab)) tab = 'q';
   root.innerHTML = `<header><div><h1>ระบบเตือนนัดทันตกรรม ผู้สูงอายุ</h1><p class="sub">${esc((settings.facility && settings.facility.name) || 'รพ.สต.')}</p></div>
     <div class="userbar">${DB.demo ? '<span class="badge">โหมดสาธิต</span>' : ''}<span>${esc(me.email)}</span><span class="tag">${isAdmin() ? 'แอดมิน' : 'เจ้าหน้าที่'}</span><button class="btn sec2 sm" id="lo">ออกจากระบบ</button></div></header>
     <nav class="tabs" role="tablist">${tabs.map(([k, l]) => `<button role="tab" data-t="${k}" aria-selected="${tab === k}">${l}</button>`).join('')}</nav>
+    <section id="v-d" ${tab === 'd' ? '' : 'hidden'} style="display:flex;flex-direction:column;gap:18px"></section>
     <section id="v-q" ${tab === 'q' ? '' : 'hidden'} style="display:flex;flex-direction:column;gap:18px"></section>
     <section id="v-a" ${tab === 'a' ? '' : 'hidden'}></section><section id="v-i" ${tab === 'i' ? '' : 'hidden'}></section><section id="v-m" ${tab === 'm' ? '' : 'hidden'}></section>
     `;
@@ -128,7 +129,25 @@ function renderShell() {
   document.querySelectorAll('nav.tabs button').forEach(b => b.onclick = () => { tab = b.dataset.t; renderShell(); renderTab(); });
   renderTab();
 }
-function renderTab() { if (!me || !me.role) return; if (tab === 'q') renderQueueView(); if (tab === 'a') renderAdd(); if (tab === 'i') renderImport(); if (tab === 'm') renderAdminTab(); }
+function renderTab() { if (!me || !me.role) return; if (tab === 'd') renderDash(); if (tab === 'q') renderQueueView(); if (tab === 'a') renderAdd(); if (tab === 'i') renderImport(); if (tab === 'm') renderAdminTab(); }
+
+// ---------- ภาพรวม ----------
+function renderDash() {
+  const v = $('#v-d'); if (!v) return;
+  if (!appts.length) { v.innerHTML = '<div class="card"><h2>ยังไม่มีนัดในระบบ</h2><p class="note">เพิ่มที่แท็บ "เพิ่มนัด"</p></div>'; return; }
+  const n = appts.length, c = { high: 0, medium: 0, low: 0 }, byDay = {}, byProc = {}, fac = {};
+  const rec = appts.filter(a => a.outcome), ns = rec.filter(a => a.outcome === 'noshow').length, pct = (x, t) => t ? Math.round(x / t * 100) : 0;
+  appts.forEach(a => { const L = lvl(a); c[L]++; (byDay[a.date] = byDay[a.date] || { high: 0, medium: 0, low: 0 })[L]++;
+    const p = (byProc[a.proc] = byProc[a.proc] || { n: 0, high: 0 }); p.n++; if (L === 'high') { p.high++; explain(a).filter(x => x.d > 0.005).slice(0, 3).forEach(x => { const o = (fac[x.f.k] = fac[x.f.k] || { f: x.f, n: 0 }); o.n++; }); } });
+  const days = Object.keys(byDay).sort(), maxDay = Math.max(...days.map(d => byDay[d].high + byDay[d].medium + byDay[d].low));
+  const facs = Object.values(fac).sort((a, b) => b.n - a.n).slice(0, 6), maxF = Math.max(1, ...facs.map(x => x.n));
+  const kpi = (val, lab, col) => `<div><div class="v" ${col ? `style="color:var(${col})"` : ''}>${val}</div><div class="k">${lab}</div></div>`;
+  const seg = (k, L) => k ? `<span style="width:${k / maxDay * 100}%;background:var(--${L === 'high' ? 'hi' : L === 'medium' ? 'mid' : 'lo'}-bg);color:var(--${L === 'high' ? 'hi' : L === 'medium' ? 'mid' : 'lo'});border-left:3px solid var(--${L === 'high' ? 'hi' : L === 'medium' ? 'mid' : 'lo'});display:flex;align-items:center;justify-content:center;font-weight:600;font-size:.8rem;min-width:22px">${k}</span>` : '';
+  v.innerHTML = `<div class="mets" style="margin-top:0">${kpi(n, 'นัดทั้งหมด')}${kpi(c.high, `เสี่ยงสูง (${pct(c.high, n)}%)`, '--hi')}${kpi(c.medium, `เสี่ยงปานกลาง (${pct(c.medium, n)}%)`, '--mid')}${kpi(c.low, `เสี่ยงต่ำ (${pct(c.low, n)}%)`, '--lo')}${kpi(rec.length, 'บันทึกผลแล้ว')}${kpi(rec.length ? pct(ns, rec.length) + '%' : '—', 'ขาดนัดจริง')}</div>
+    <div class="grid2"><div class="card"><h2>จำนวนนัดรายวัน</h2><div style="display:flex;flex-direction:column;gap:6px;margin-top:10px">${days.map(d => { const x = byDay[d]; return `<div style="display:grid;grid-template-columns:96px minmax(0,1fr);gap:10px;align-items:center;font-size:.85rem"><span class="note">${new Date(d + 'T00:00:00').toLocaleDateString('th-TH', { weekday: 'short', day: 'numeric', month: 'short' })}</span><div style="display:flex;height:26px;gap:2px">${seg(x.high, 'high')}${seg(x.medium, 'medium')}${seg(x.low, 'low')}</div></div>`; }).join('')}</div></div>
+    <div class="card"><h2>ปัจจัยที่พบบ่อยในกลุ่มเสี่ยงสูง</h2>${facs.length ? facs.map(x => `<div class="bar"><span>${x.f.label}<br><span class="note">${GRP_TH[x.f.grp]}</span></span><div class="track"><div class="fill g-${x.f.grp}" style="width:${x.n / maxF * 100}%"></div></div><span class="num">${x.n}</span></div>`).join('') : '<p class="note">ไม่มีนัดเสี่ยงสูง</p>'}
+    <h2 style="margin-top:18px">สัดส่วนเสี่ยงสูงตามหัตถการ</h2>${Object.entries(byProc).map(([k, x]) => `<div class="bar"><span>${PROC_TH[k]}</span><div class="track"><div class="fill" style="width:${pct(x.high, x.n)}%;background:var(--hi)"></div></div><span class="num">${pct(x.high, x.n)}%</span></div>`).join('')}</div></div>`;
+}
 
 // ---------- คิวนัด ----------
 const dates = () => [...new Set(appts.map(a => a.date))].sort();
@@ -293,7 +312,7 @@ function modelHtml(m) {
     me = u; if (unA) unA(), unA = null; if (unS) unS(), unS = null; appts = []; settings = {};
     renderShell();
     if (me && me.role) {
-      unA = DB.subAppts(list => { appts = (list || []).map(a => ({ ...a, p: predict(a) })); if (tab === 'q') renderQueueView(); if (tab === 'm') renderAdminTab(); });
+      unA = DB.subAppts(list => { appts = (list || []).map(a => ({ ...a, p: predict(a) })); if (tab === 'd') renderDash(); if (tab === 'q') renderQueueView(); if (tab === 'm') renderAdminTab(); });
       unS = DB.subSettings(s => { settings = s || {}; const keepTab = tab; renderShell(); tab = keepTab; });
     }
   });
