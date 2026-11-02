@@ -6,7 +6,7 @@ import numpy as np, pandas as pd
 def generate(n_patients=900, seed=42):
     rng = np.random.default_rng(seed)
     pts = pd.DataFrame({
-        "patient_id": np.arange(1, n_patients + 1),
+        "patient_id": [f"P{i:04d}" for i in range(1, n_patients + 1)],
         "age": np.clip(rng.normal(70, 7, n_patients), 60, 95).round().astype(int),
         "sex": rng.choice(["F", "M"], n_patients, p=[.58, .42]),
         "marital": rng.choice(["married", "widowed", "single"], n_patients, p=[.55, .35, .10]),

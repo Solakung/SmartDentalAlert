@@ -1,0 +1,6 @@
+patient_id,appt_date,period,procedure,age,sex,marital,scheme,distance_km,chronic_disease,lead_days,prior_appts,prior_noshows
+P0471,2023-01-01,morning,scaling,72,M,married,UC,11.6,1,3,0,0
+P0332,2023-01-01,morning,perio,74,M,married,UC,4.0,1,21,0,0
+P0071,2023-01-01,afternoon,perio,61,F,widowed,social,8.1,0,14,0,0
+P0432,2023-01-01,morning,scaling,73,F,married,UC,8.9,1,3,0,0
+P0748,2023-01-01,morning,denture,74,F,single,UC,4.8,0,30,0,0

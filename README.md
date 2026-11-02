@@ -38,3 +38,14 @@ python3 build_mockup.py      # สร้าง docs/index.html จากผล�
 
 ## ใช้กับหลายหน่วยบริการ
 ชื่อหน่วยบริการตั้งได้ผ่านตัวแปร `FACILITY_NAME` (ทั้ง `line-notifier` และ `build_mockup.py`) ข้อมูลเตาถ่านใช้เป็นชุดฝึกของโมเดลเท่านั้น หน่วยบริการอื่นควรตรวจสอบประสิทธิภาพและฝึกโมเดลใหม่ด้วยข้อมูลของตัวเองก่อนใช้งาน
+
+## ขั้นตอนใช้กับข้อมูลของแต่ละหน่วยบริการ (วิธีนำเข้าไฟล์)
+1. ส่งออกประวัตินัดจาก JHCIS ตามแม่แบบ `templates/training_template.csv` (ใช้รหัสวิจัย ไม่มีชื่อ/เลขบัตร)
+2. `python3 validate_csv.py ประวัติ.csv` ตรวจคอลัมน์ ช่วงค่า และคอลัมน์ที่อาจเป็นข้อมูลระบุตัวตน
+3. `python3 train_model.py ประวัติ.csv` ฝึกโมเดลของหน่วยนั้นเอง (ไม่ใช้โมเดลข้ามหน่วย)
+4. ส่งออกนัดล่วงหน้าตาม `templates/upcoming_template.csv` แล้วรัน
+   `python3 score_new.py upcoming.csv --history ประวัติ.csv -o scored_for_import.csv`
+   (`--history` คำนวณจำนวนนัดและการขาดนัดก่อนหน้าให้เอง)
+5. นำ `scored_for_import.csv` เข้าหน้าแอดมิน แท็บ "นำเข้านัดหมาย" และตั้งจุดตัดให้ตรงกับที่สคริปต์แจ้ง
+
+คอลัมน์ที่ต้องมี: `patient_id, appt_date, period, procedure, age, sex, marital, scheme, distance_km, chronic_disease, lead_days, prior_appts, prior_noshows` (+ `no_show` ในไฟล์ฝึก) ค่าที่ยอมรับของ period/sex/marital/scheme/procedure ดูใน `schema.py`

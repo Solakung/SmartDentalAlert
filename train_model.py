@@ -55,6 +55,7 @@ def metrics(y, p, thr):
                 tn=int(tn), fp=int(fp), fn=int(fn), tp=int(tp), threshold=float(thr))
 
 df = pd.read_csv(CSV, parse_dates=["appt_date"])
+from schema import derive; df = derive(df)   # เติม dow / prior_noshow_rate หากไฟล์ไม่มี
 df["out_area"] = (df.distance_km > 8).astype(int)   # แทนรหัสหมู่บ้าน ในเขต/นอกเขต
 df = pd.get_dummies(df, columns=CAT, dtype=float)
 feat_cols = [c for c in df.columns if any(c == f or c.startswith(f + "_") for f in ALL)]
