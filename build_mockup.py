@@ -12,7 +12,7 @@ def reasons(r):  # ใช้เฉพาะตัวแปรตามภาค�
     if r.lead_days >= 30: o.append(f"นัดล่วงหน้านาน {int(r.lead_days)} วัน")
     if r.dow == 0: o.append("นัดวันจันทร์")
     return o
-MS = {"married":"สมรส","widowed":"หม้าย","single":"โสด"}; SC = {"UC":"บัตรทอง","civil":"ข้าราชการ","social":"ประกันสังคม"}
+MS = {"married":"สมรส","widowed":"หม้าย","single":"โสด","divorced":"หย่าร้าง"}; SC = {"UC":"บัตรทอง","civil":"ข้าราชการ","social":"ประกันสังคม"}
 rows = [dict(id=str(r.patient_id), date=r.appt_date.strftime("%Y-%m-%d"), period=r.period, age=int(r.age), sex=r.sex,
              proc=PM[r["procedure"]], outArea=int(r.distance_km > 8), scheme=SC[r.scheme], marital=MS[r.marital], lead=int(r.lead_days),
              prior=int(r.prior_appts), priorNs=int(r.prior_noshows), p=float(r.risk_prob), level=r.risk_level, reasons=reasons(r))

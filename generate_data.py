@@ -9,7 +9,7 @@ def generate(n_patients=900, seed=42):
         "patient_id": [f"P{i:04d}" for i in range(1, n_patients + 1)],
         "age": np.clip(rng.normal(70, 7, n_patients), 60, 95).round().astype(int),
         "sex": rng.choice(["F", "M"], n_patients, p=[.58, .42]),
-        "marital": rng.choice(["married", "widowed", "single"], n_patients, p=[.55, .35, .10]),
+        "marital": rng.choice(["married", "widowed", "single", "divorced"], n_patients, p=[.52, .33, .07, .08]),
         "education": rng.choice(["primary", "secondary", "higher"], n_patients, p=[.72, .20, .08]),
         "occupation": rng.choice(["agri", "labor", "retired", "trade"], n_patients, p=[.30, .15, .40, .15]),
         "scheme": rng.choice(["UC", "civil", "social"], n_patients, p=[.80, .12, .08]),
@@ -29,18 +29,18 @@ def generate(n_patients=900, seed=42):
         for d in dates:
             d = pd.Timestamp(d)
             lead = int(rng.choice([3, 7, 14, 21, 30, 45]))
-            proc = rng.choice(["scaling", "extraction", "filling", "denture", "perio"],
-                              p=[.30, .15, .20, .15, .20])
+            proc = rng.choice(["scaling", "extraction", "filling", "denture"], p=[.35, .20, .25, .20])
+            cont = int(rng.random() < (0.8 if n_app else 0.1))   # นัดต่อเนื่องตามแผน (1) / ตรวจใหม่ (0)
             hist_rate = n_ns / n_app if n_app else 0.0
             z = (-2.35 + p.propensity + 0.045*(p.distance_km - 4) - 0.55*p.has_caregiver
                  - 0.30*p.has_phone + 0.012*lead + 1.6*hist_rate + 0.25*(n_ns >= 1)
                  + (0.35 if d.dayofweek == 0 else 0)
-                 + {"scaling":.15,"extraction":-.35,"filling":.0,"denture":.2,"perio":-.1}[proc]
+                 + {"scaling":.15,"extraction":-.35,"filling":.0,"denture":.2}[proc] - 0.30*cont
                  + 0.02*(p.age-70) + (0.2 if p.education == "primary" else 0))
             ns = int(rng.random() < 1/(1+np.exp(-z)))
             rows.append(dict(patient_id=p.patient_id, appt_date=d, lead_days=lead, procedure=proc,
                              dow=d.dayofweek, period=rng.choice(["morning","afternoon"], p=[.7,.3]),
-                             prior_appts=n_app, prior_noshows=n_ns, prior_noshow_rate=round(hist_rate,3),
+                             continuing_care=cont, prior_appts=n_app, prior_noshows=n_ns, prior_noshow_rate=round(hist_rate,3),
                              no_show=ns))
             n_app += 1; n_ns += ns
     df = pd.DataFrame(rows).merge(pts.drop(columns="propensity"), on="patient_id")

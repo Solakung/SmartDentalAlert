@@ -23,14 +23,14 @@ if FULL:   # ชุดขยาย: เพิ่มตัวแปรนอก�
     ANDERSEN = {
      "Predisposing": ["age","sex","marital","education","occupation","prior_noshows","prior_noshow_rate","prior_appts"],
      "Enabling":     ["scheme","distance_km","has_phone","has_caregiver","dow","period","lead_days"],
-     "Need":         ["procedure","chronic_disease"],
+     "Need":         ["procedure","chronic_disease","continuing_care"],
     }
     CAT = ["sex","marital","education","occupation","scheme","procedure","period"]
 else:      # ชุดตามเล่ม (ภาคผนวก ก)
     ANDERSEN = {
      "Predisposing": ["age","sex","marital","prior_noshows","prior_noshow_rate"],
      "Enabling":     ["scheme","out_area","dow","period","lead_days"],
-     "Need":         ["procedure","chronic_disease"],
+     "Need":         ["procedure","chronic_disease","continuing_care"],
     }
     CAT = ["sex","marital","scheme","procedure","period"]
 ALL = sum(ANDERSEN.values(), [])
@@ -71,7 +71,7 @@ print(f"train={len(train)}  (val={len(val)})  test={len(test)} | no-show rate tr
 def fit_rf(X, y, balance, rng):
     if balance == "smote": X, y = smote(X, y, rng); cw = None
     else: cw = "balanced_subsample" if balance == "weight" else None
-    return RandomForestClassifier(n_estimators=500, min_samples_leaf=5, max_features="sqrt",
+    return RandomForestClassifier(n_estimators=200, min_samples_leaf=5, max_features="sqrt",
                                   class_weight=cw, n_jobs=-1, random_state=SEED).fit(X, y)
 
 rng = np.random.default_rng(SEED)
@@ -127,3 +127,19 @@ out = pd.read_csv(CSV, parse_dates=["appt_date"]); out = out[out.appt_date.dt.ye
 out["risk_prob"] = pte.round(4); out["risk_level"] = level; out.to_csv("test_predictions.csv", index=False)
 json.dump(res, open("results.json", "w"), ensure_ascii=False, indent=1)
 joblib.dump(dict(model=final, features=feat_cols, cutoffs=res["risk_cutoffs"]), "model.joblib")
+
+# ---- ส่งออกโมเดลเป็น JSON ให้หน้าเว็บคำนวณความเสี่ยงเองได้ (docs/app/model.json) ----
+def tree_json(est):
+    tr = est.tree_; v = tr.value[:, 0, :]; p1 = v[:, 1] / v.sum(axis=1)
+    leaf = tr.children_left == -1
+    return dict(f=[-1 if l else int(f) for l, f in zip(leaf, tr.feature)], t=[round(float(x), 4) for x in tr.threshold],
+                l=[int(x) for x in tr.children_left], r=[int(x) for x in tr.children_right], v=[round(float(x), 4) for x in p1])
+raw = pd.read_csv(CSV, parse_dates=["appt_date"]); raw = derive(raw); raw["out_area"] = (raw.distance_km > 8).astype(int)
+ref = {}
+for f in ALL:
+    ref[f] = (str(raw[f].mode().iloc[0]) if f in CAT else float(raw[f].median())) if f in raw else 0
+exp = dict(features=feat_cols, trees=[tree_json(e) for e in final.estimators_], ref=ref, cutoffs=dict(low=round(thr_low * 100), high=round(thr_high * 100)),
+           andersen=ANDERSEN, synthetic=True)
+os.makedirs("docs/app", exist_ok=True)
+json.dump(exp, open("docs/app/model.json", "w"), separators=(",", ":"))
+print("model.json: %.2f MB" % (os.path.getsize("docs/app/model.json") / 1e6))

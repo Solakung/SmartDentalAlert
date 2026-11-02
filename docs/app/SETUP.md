@@ -13,4 +13,6 @@
 7. Authentication → Settings → Authorized domains เพิ่ม `solakung.github.io`
 8. เปิดที่ https://solakung.github.io/SmartDentalAlert/app/
 
-ใช้งาน: แอดมินอัปโหลด `scored_for_import.csv` จาก `score_new.py` ที่แท็บนำเข้า เจ้าหน้าที่เห็นคิวและบันทึกผลมา/ขาดนัดได้เท่านั้น
+ใช้งาน: เจ้าหน้าที่/แอดมินกรอกตัวแปรตามภาคผนวก ก ที่แท็บเพิ่มนัด ระบบคำนวณความเสี่ยงและเหตุผลตามกรอบ Andersen ในหน้าเว็บ (ใช้ `model.json` จาก `train_model.py`) แอดมินนำเข้าหลายรายจาก CSV (รูปแบบ `templates/upcoming_template.csv`) ได้
+
+หมายเหตุ: `docs/app/model.json` ตอนนี้ฝึกจากข้อมูลจำลอง เมื่อฝึกด้วยข้อมูลจริงห้าม commit ขึ้น repo สาธารณะ

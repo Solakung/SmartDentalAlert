@@ -2,14 +2,14 @@
 import re
 import pandas as pd
 
-ENUMS = {"period": {"morning", "afternoon"}, "sex": {"F", "M"}, "marital": {"married", "widowed", "single"},
-         "scheme": {"UC", "civil", "social"}, "procedure": {"scaling", "extraction", "filling", "denture", "perio"}}
-PROC_TH = {"scaling": "ขูดหินปูน", "extraction": "ถอนฟัน", "filling": "อุดฟัน", "denture": "ฟันเทียม", "perio": "รักษาปริทันต์"}
-RANGES = {"age": (60, 110), "lead_days": (0, 365), "distance_km": (0, 200), "chronic_disease": (0, 1), "no_show": (0, 1),
+ENUMS = {"period": {"morning", "afternoon"}, "sex": {"F", "M"}, "marital": {"married", "widowed", "single", "divorced"},
+         "scheme": {"UC", "civil", "social"}, "procedure": {"scaling", "extraction", "filling", "denture"}}
+PROC_TH = {"scaling": "ขูดหินปูน", "extraction": "ถอนฟัน", "filling": "อุดฟัน", "denture": "ฟันเทียม"}
+RANGES = {"age": (60, 110), "lead_days": (0, 365), "distance_km": (0, 200), "chronic_disease": (0, 1), "continuing_care": (0, 1), "no_show": (0, 1),
           "prior_appts": (0, 500), "prior_noshows": (0, 500)}
 # จำเป็นเสมอ (prior_noshow_rate และ dow คำนวณให้เองได้)
 REQUIRED = ["patient_id", "appt_date", "period", "procedure", "age", "sex", "marital", "scheme", "distance_km",
-            "chronic_disease", "lead_days", "prior_appts", "prior_noshows"]
+            "chronic_disease", "continuing_care", "lead_days", "prior_appts", "prior_noshows"]
 ID_RE = re.compile(r"^P?\d{3,6}$", re.I)
 KNOWN_OK = {"has_phone", "has_caregiver"}   # ธง 0/1 ในชุดขยาย ไม่ใช่เบอร์โทร
 PII_HINTS = ("name", "ชื่อ", "cid", "id_card", "idcard", "citizen", "เลขบัตร", "phone", "tel", "โทร", "address", "ที่อยู่", "hn")
