@@ -1,0 +1,38 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function hasRole() { return request.auth != null && exists(/databases/$(database)/documents/users/$(request.auth.uid)); }
+    function isAdmin() { return hasRole() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'; }
+
+    // บทบาทกำหนดใน Firebase Console เท่านั้น (client เขียนไม่ได้) ผู้ใช้อ่านได้เฉพาะของตัวเอง
+    match /users/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    match /appointments/{id} {
+      allow read: if hasRole();
+      // แอดมินสร้างได้เฉพาะฟิลด์ที่กำหนด รหัสต้องเป็นรหัสวิจัย (กันชื่อ/ข้อมูลระบุตัวตนหลุดเข้ามา)
+      allow create: if isAdmin()
+        && request.resource.data.keys().hasOnly(['id','date','period','proc','age','sex','p','outcome','done','createdAt'])
+        && request.resource.data.id is string && request.resource.data.id.matches('^P[0-9]{3,6}$')
+        && request.resource.data.date is string && request.resource.data.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && request.resource.data.period in ['morning','afternoon']
+        && request.resource.data.sex in ['F','M']
+        && request.resource.data.age is int && request.resource.data.age >= 60 && request.resource.data.age <= 110
+        && request.resource.data.p is number && request.resource.data.p >= 0 && request.resource.data.p <= 1
+        && request.resource.data.proc is string && request.resource.data.proc.size() <= 30
+        && (request.resource.data.outcome == null || request.resource.data.outcome in ['came','noshow']);
+      allow delete: if isAdmin();
+      // เจ้าหน้าที่แก้ได้เฉพาะผลการมาและรายการมาตรการที่ทำแล้ว
+      allow update: if isAdmin() || (hasRole()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['outcome','done','updatedAt','updatedBy'])
+        && (request.resource.data.outcome == null || request.resource.data.outcome in ['came','noshow']));
+    }
+
+    match /settings/{name} {
+      allow read: if hasRole();
+      allow write: if isAdmin();
+    }
+  }
+}

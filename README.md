@@ -49,3 +49,7 @@ python3 build_mockup.py      # สร้าง docs/index.html จากผล�
 5. นำ `scored_for_import.csv` เข้าหน้าแอดมิน แท็บ "นำเข้านัดหมาย" และตั้งจุดตัดให้ตรงกับที่สคริปต์แจ้ง
 
 คอลัมน์ที่ต้องมี: `patient_id, appt_date, period, procedure, age, sex, marital, scheme, distance_km, chronic_disease, lead_days, prior_appts, prior_noshows` (+ `no_show` ในไฟล์ฝึก) ค่าที่ยอมรับของ period/sex/marital/scheme/procedure ดูใน `schema.py`
+
+## แดชบอร์ดเว็บ (Firebase login)
+`docs/app/` เป็นเว็บที่ล็อกอินจริง (แอดมิน/เจ้าหน้าที่) ใช้ Firebase Auth + Firestore พร้อม `firestore.rules`
+ยังไม่ตั้งค่า Firebase จะรันโหมดสาธิต ดูขั้นตอนใน [docs/app/SETUP.md](docs/app/SETUP.md)
