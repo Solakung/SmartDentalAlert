@@ -104,7 +104,7 @@ const isAdmin = () => me && me.role === 'admin';
 function renderShell() {
   const root = $('#app');
   if (!me) {
-    root.innerHTML = `<div class="login"><div><h1>Smart Dental Alert</h1></div>
+    root.innerHTML = `<div class="login"><div class="brand"><img src="icons/logo.png" alt="Smart Dental Alert" width="180" height="180"><h1 class="sr">Smart Dental Alert</h1></div>
       ${DB.demo ? '<p class="banner">โหมดสาธิต</p>' : ''}
       <div class="card"><div class="form" style="grid-template-columns:1fr"><label>อีเมล<input type="text" id="lg-email" autocomplete="username" inputmode="email"></label>
       <label>รหัสผ่าน<input type="password" id="lg-pw" autocomplete="current-password"></label></div>

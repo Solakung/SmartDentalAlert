@@ -4,6 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Smart Dental Alert</title>
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="64x64" href="icons/favicon-64.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#17566e">
+<meta name="apple-mobile-web-app-title" content="Smart Dental Alert">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
 /* Layout: ตารางนัดรายวันทางซ้าย + แผงรายละเอียดผู้ป่วยทางขวา (มือถือ: แผงเลื่อนลงใต้รายการ) */
@@ -117,6 +123,8 @@ code.block{display:block;white-space:pre;overflow-x:auto;background:var(--surfac
 
 .login{max-width:380px;margin:12vh auto 0;display:flex;flex-direction:column;gap:12px}
 .login h1{font-size:1.4rem}
+.brand{text-align:center}.brand img{width:180px;height:180px;max-width:60vw;max-height:60vw}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .userbar{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;font-size:.85rem;color:var(--muted)}
 .banner{background:var(--mid-bg);color:var(--mid);padding:8px 12px;border-radius:4px;font-size:.85rem;font-weight:500}
 .mono{font-family:var(--mono);overflow-wrap:anywhere}
