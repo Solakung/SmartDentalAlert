@@ -32,8 +32,10 @@ service cloud.firestore {
       allow delete: if isAdmin();
       // เจ้าหน้าที่แก้ได้เฉพาะผลการมาและรายการมาตรการที่ทำแล้ว
       allow update: if isAdmin() || (hasRole()
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['outcome','done','updatedAt','updatedBy'])
-        && (request.resource.data.outcome == null || request.resource.data.outcome in ['came','noshow']));
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['outcome','done','reason','reasonNote','updatedAt','updatedBy'])
+        && (request.resource.data.outcome == null || request.resource.data.outcome in ['came','noshow'])
+        && (request.resource.data.get('reason', null) == null || request.resource.data.reason in ['forgot','travel','no_escort','sick','busy','afraid','other'])
+        && (request.resource.data.get('reasonNote', null) == null || (request.resource.data.reasonNote is string && request.resource.data.reasonNote.size() <= 100)));
     }
 
     match /settings/{name} {

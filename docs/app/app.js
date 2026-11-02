@@ -28,6 +28,7 @@ const FACTORS = [
   { k: 'chronic', grp: 'Need', label: 'โรคเรื้อรัง', vars: ['chronic_disease'], txt: a => a.chronic ? 'มีโรคประจำตัว' : 'ไม่มี' },
   { k: 'cont', grp: 'Need', label: 'ความต่อเนื่องของการรักษา', vars: ['continuing_care'], txt: a => a.cont ? 'นัดต่อเนื่องตามแผน' : 'ตรวจใหม่' },
 ];
+const REASONS = { forgot: 'ลืมนัด', travel: 'เดินทางไม่สะดวก', no_escort: 'ไม่มีผู้พามา', sick: 'ป่วยหรือไม่สบาย', busy: 'ติดธุระหรือภาระงาน', afraid: 'กลัวหรือกังวลเรื่องการรักษา', other: 'อื่นๆ' };
 let M = null;   // โมเดลที่โหลดจาก model.json
 function featVec(a, over) {
   const raw = { age: a.age, sex: a.sex, marital: a.marital, prior_noshows: a.priorNs, prior_noshow_rate: a.priorAp ? a.priorNs / a.priorAp : 0, scheme: a.scheme, out_area: a.outArea,
@@ -65,7 +66,8 @@ async function makeFirebase() {
     logout: () => A.signOut(auth),
     subAppts: cb => F.onSnapshot(F.collection(fs, 'appointments'), s => cb(s.docs.map(d => ({ _id: d.id, ...d.data() }))), () => cb([])),
     subSettings: cb => F.onSnapshot(F.collection(fs, 'settings'), s => { const o = {}; s.docs.forEach(d => o[d.id] = d.data()); cb(o); }, () => cb({})),
-    setOutcome: (id, v, by) => F.updateDoc(ref('appointments', id), { outcome: v, updatedBy: by, updatedAt: F.serverTimestamp() }),
+    setOutcome: (id, v, by) => F.updateDoc(ref('appointments', id), v === 'noshow' ? { outcome: v, updatedBy: by, updatedAt: F.serverTimestamp() } : { outcome: v, reason: null, reasonNote: null, updatedBy: by, updatedAt: F.serverTimestamp() }),
+    setReason: (id, reason, note, by) => F.updateDoc(ref('appointments', id), { reason: reason || null, reasonNote: note || null, updatedBy: by, updatedAt: F.serverTimestamp() }),
     setDone: (id, i, v, by) => F.updateDoc(ref('appointments', id), { ['done.' + i]: v, updatedBy: by, updatedAt: F.serverTimestamp() }),
     addAppts: list => batched(list, (b, a) => { const { _id, ...d } = a; b.set(ref('appointments', _id), { ...d, outcome: null, done: {}, createdAt: F.serverTimestamp() }); }),
     clearAppts: ids => batched(ids, (b, id) => b.delete(ref('appointments', id))),
@@ -81,7 +83,8 @@ function makeDemo() {
     async login(e) { user = { uid: 'demo-' + e, email: e, role: /^admin/i.test(e) ? 'admin' : 'staff' }; emitU(); },
     async logout() { user = null; emitU(); },
     subAppts(cb) { subsA.push(cb); cb(appts); return () => {}; }, subSettings(cb) { subsS.push(cb); cb(settings); return () => {}; },
-    async setOutcome(id, v) { appts.find(a => a._id === id).outcome = v; emitA(); },
+    async setOutcome(id, v) { const a = appts.find(x => x._id === id); a.outcome = v; if (v !== 'noshow') { a.reason = null; a.reasonNote = null; } emitA(); },
+    async setReason(id, r, n) { const a = appts.find(x => x._id === id); a.reason = r || null; a.reasonNote = n || null; emitA(); },
     async setDone(id, i, v) { const a = appts.find(x => x._id === id); a.done = { ...a.done, [i]: v }; emitA(); },
     async addAppts(l) { l.forEach(a => appts.push({ ...a, outcome: null, done: {} })); emitA(); },
     async clearAppts(ids) { appts = appts.filter(a => !ids.includes(a._id)); emitA(); },
@@ -146,6 +149,7 @@ function renderDash() {
   v.innerHTML = `<div class="mets" style="margin-top:0">${kpi(n, 'นัดทั้งหมด')}${kpi(c.high, `เสี่ยงสูง (${pct(c.high, n)}%)`, '--hi')}${kpi(c.medium, `เสี่ยงปานกลาง (${pct(c.medium, n)}%)`, '--mid')}${kpi(c.low, `เสี่ยงต่ำ (${pct(c.low, n)}%)`, '--lo')}${kpi(rec.length, 'บันทึกผลแล้ว')}${kpi(rec.length ? pct(ns, rec.length) + '%' : '—', 'ขาดนัดจริง')}</div>
     <div class="grid2"><div class="card"><h2>จำนวนนัดรายวัน</h2><div style="display:flex;flex-direction:column;gap:6px;margin-top:10px">${days.map(d => { const x = byDay[d]; return `<div style="display:grid;grid-template-columns:96px minmax(0,1fr);gap:10px;align-items:center;font-size:.85rem"><span class="note">${new Date(d + 'T00:00:00').toLocaleDateString('th-TH', { weekday: 'short', day: 'numeric', month: 'short' })}</span><div style="display:flex;height:26px;gap:2px">${seg(x.high, 'high')}${seg(x.medium, 'medium')}${seg(x.low, 'low')}</div></div>`; }).join('')}</div></div>
     <div class="card"><h2>ปัจจัยที่พบบ่อยในกลุ่มเสี่ยงสูง</h2>${facs.length ? facs.map(x => `<div class="bar"><span>${x.f.label}<br><span class="note">${GRP_TH[x.f.grp]}</span></span><div class="track"><div class="fill g-${x.f.grp}" style="width:${x.n / maxF * 100}%"></div></div><span class="num">${x.n}</span></div>`).join('') : '<p class="note">ไม่มีนัดเสี่ยงสูง</p>'}
+    ${(() => { const rc = {}; appts.filter(a => a.outcome === 'noshow' && a.reason).forEach(a => rc[a.reason] = (rc[a.reason] || 0) + 1); const e = Object.entries(rc).sort((x, y) => y[1] - x[1]), m = Math.max(1, ...e.map(x => x[1])); return e.length ? `<h2 style="margin-top:18px">สาเหตุที่ขาดนัด</h2>` + e.map(([k, n]) => `<div class="bar"><span>${REASONS[k]}</span><div class="track"><div class="fill" style="width:${n / m * 100}%;background:var(--accent)"></div></div><span class="num">${n}</span></div>`).join('') : ''; })()}
     <h2 style="margin-top:18px">สัดส่วนเสี่ยงสูงตามหัตถการ</h2>${Object.entries(byProc).map(([k, x]) => `<div class="bar"><span>${PROC_TH[k]}</span><div class="track"><div class="fill" style="width:${pct(x.high, x.n)}%;background:var(--hi)"></div></div><span class="num">${pct(x.high, x.n)}%</span></div>`).join('')}</div></div>`;
 }
 
@@ -199,9 +203,12 @@ function renderPanel() {
     <div><p class="sec">มาตรการที่แนะนำ</p>${ACTIONS[L].map((t, i) => `<div class="act"><input type="checkbox" id="a${i}" data-i="${i}" ${done[i] ? 'checked' : ''}><label for="a${i}">${t}</label></div>`).join('')}</div>
     <div><p class="sec">ข้อความ LINE (จำลอง ยังไม่ส่งจริง)</p>${lineMsgs(a, L).map(bubbleHtml).join('')}${L === 'high' ? `<div class="act"><input type="checkbox" id="go" ${done.go ? 'checked' : ''}><label for="go">อสม. ออกเดินทางแล้ว</label></div>` : ''}</div>
     <div><p class="sec">ผลการมารับบริการ</p><div class="outc"><button data-o="came" aria-pressed="${a.outcome === 'came'}">มาตามนัด</button><button data-o="noshow" aria-pressed="${a.outcome === 'noshow'}">ขาดนัด</button></div></div>
+    ${a.outcome === 'noshow' ? `<div><p class="sec">สาเหตุที่ขาดนัด</p><div class="form" style="grid-template-columns:1fr"><label>สาเหตุ<select id="rs"><option value="">ไม่ระบุ</option>${Object.entries(REASONS).map(([k, v]) => `<option value="${k}" ${a.reason === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
+      <label>หมายเหตุ (ไม่เกิน 100 ตัวอักษร ห้ามใส่ชื่อ)<input type="text" id="rn" maxlength="100" value="${esc(a.reasonNote || '')}"></label></div></div>` : ''}
     <p id="p-err"></p>`;
   const fail = () => { $('#p-err').innerHTML = '<p class="msg err" role="alert">บันทึกไม่สำเร็จ ตรวจสิทธิ์หรืออินเทอร์เน็ตแล้วลองใหม่</p>'; };
   P.querySelectorAll('input[type=checkbox]').forEach(x => x.onchange = () => DB.setDone(a._id, x.id === 'go' ? 'go' : x.dataset.i, x.checked, me.email).catch(fail));
+  if ($('#rs')) { const sv = () => DB.setReason(a._id, $('#rs').value, $('#rn').value.trim().slice(0, 100), me.email).catch(fail); $('#rs').onchange = sv; $('#rn').onchange = sv; }
   P.querySelectorAll('.outc button').forEach(b => b.onclick = () => DB.setOutcome(a._id, a.outcome === b.dataset.o ? null : b.dataset.o, me.email).catch(fail));
 }
 
