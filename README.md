@@ -30,7 +30,7 @@ python3 build_mockup.py      # สร้าง docs/index.html จากผล�
 (เก็บไว้ในโฟลเดอร์ `data_real/` ซึ่งถูก ignore) ตัวแปรเริ่มต้นตามภาคผนวก ก ใช้ `FEATURESET=full` เพื่อวิเคราะห์ความไวด้วยตัวแปรเพิ่ม
 
 ## ขั้นตอนตามบทที่ 3
-1. แบ่งข้อมูลตามเวลา: ฝึก 2566–67 (Validation = ครึ่งหลัง 2567), ทดสอบ 2568
+1. แบ่งข้อมูลตามเวลา: ฝึก 2566–67 (ตรวจสอบภายในด้วย Stratified Group 5-Fold จัดกลุ่มตามผู้ป่วย), ทดสอบ 2568
 2. SMOTE เฉพาะชุดฝึก แล้วฝึก Random Forest เทียบกับ class_weight และ Logistic regression
 3. ตัวชี้วัด: Accuracy, Precision, Recall, F1, AUC, PR-AUC, Brier
 4. ความสำคัญของตัวแปร: Gini และ Permutation จัดกลุ่มตาม Andersen

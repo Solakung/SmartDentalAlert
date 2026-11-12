@@ -4,9 +4,9 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const LV = { high: 'เสี่ยงสูง', medium: 'เสี่ยงปานกลาง', low: 'เสี่ยงต่ำ' };
 const ACTIONS = {
-  high: ['ประสาน อสม. ประจำคุ้มบ้านเยี่ยมบ้านก่อนวันนัด', 'โทรประสานญาติหรือผู้ดูแลเพื่อยืนยันการมา', 'ประสานรถรับส่งในชุมชน หากเดินทางลำบาก'],
-  medium: ['โทรติดตามผู้ดูแลล่วงหน้า 2–3 วัน', 'ประเมินความพร้อมและยืนยันการเดินทาง'],
-  low: ['ส่ง SMS แจ้งเตือนอัตโนมัติก่อนวันนัด'],
+  high: ['ประสาน อสม. เยี่ยมบ้านล่วงหน้า', 'ประสานญาติหรือผู้ดูแลเพื่อยืนยันการมา', 'จัดรถรับส่ง หากเดินทางลำบาก'],
+  medium: ['โทรหรือส่งข้อความ LINE ถึงผู้ดูแลล่วงหน้า 2–3 วัน', 'ประเมินความพร้อมและยืนยันการเดินทาง'],
+  low: ['ส่งข้อความแจ้งเตือนอัตโนมัติถึงผู้ป่วย (SMS หรือ LINE)'],
 };
 const PROC_TH = { scaling: 'ขูดหินปูน', extraction: 'ถอนฟัน', filling: 'อุดฟัน', denture: 'ฟันเทียม' };
 const MAR_TH = { single: 'โสด', married: 'สมรส', widowed: 'หม้าย', divorced: 'หย่าร้าง' };
@@ -20,7 +20,7 @@ const FACTORS = [
   { k: 'sex', grp: 'Predisposing', label: 'เพศ', vars: ['sex'], txt: a => a.sex === 'F' ? 'หญิง' : 'ชาย' },
   { k: 'marital', grp: 'Predisposing', label: 'สถานภาพสมรส', vars: ['marital'], txt: a => MAR_TH[a.marital] },
   { k: 'scheme', grp: 'Enabling', label: 'สิทธิการรักษา', vars: ['scheme'], txt: a => SCH_TH[a.scheme] },
-  { k: 'area', grp: 'Enabling', label: 'ที่พักอาศัย', vars: ['out_area'], txt: a => a.outArea ? 'นอกเขต รพ.สต.' : 'ในเขต รพ.สต.' },
+  { k: 'area', grp: 'Enabling', label: 'ระยะทางจากที่พัก', vars: ['distance_km'], txt: a => `${distOf(a)} กม. ถึง รพ.สต.` },
   { k: 'lead', grp: 'Enabling', label: 'นัดล่วงหน้า', vars: ['lead_days'], txt: a => `${a.lead} วัน` },
   { k: 'dow', grp: 'Enabling', label: 'วันในสัปดาห์', vars: ['dow'], txt: a => 'วัน' + DOW_TH[a.dow] },
   { k: 'period', grp: 'Enabling', label: 'ช่วงเวลานัด', vars: ['period'], txt: a => a.period === 'morning' ? 'ช่วงเช้า' : 'ช่วงบ่าย' },
@@ -29,9 +29,11 @@ const FACTORS = [
   { k: 'cont', grp: 'Need', label: 'ความต่อเนื่องของการรักษา', vars: ['continuing_care'], txt: a => a.cont ? 'นัดต่อเนื่องตามแผน' : 'ตรวจใหม่' },
 ];
 const REASONS = { forgot: 'ลืมนัด', travel: 'เดินทางไม่สะดวก', no_escort: 'ไม่มีผู้พามา', sick: 'ป่วยหรือไม่สบาย', busy: 'ติดธุระหรือภาระงาน', afraid: 'กลัวหรือกังวลเรื่องการรักษา', other: 'อื่นๆ' };
+// นัดที่บันทึกก่อนเปลี่ยนเป็นระยะทางมีแค่ในเขต/นอกเขต ใช้ค่าประมาณแทน
+const distOf = a => typeof a.dist === 'number' ? a.dist : (a.outArea ? 10 : 3);
 let M = null;   // โมเดลที่โหลดจาก model.json
 function featVec(a, over) {
-  const raw = { age: a.age, sex: a.sex, marital: a.marital, prior_noshows: a.priorNs, prior_noshow_rate: a.priorAp ? a.priorNs / a.priorAp : 0, scheme: a.scheme, out_area: a.outArea,
+  const raw = { age: a.age, sex: a.sex, marital: a.marital, prior_noshows: a.priorNs, prior_noshow_rate: a.priorAp ? a.priorNs / a.priorAp : 0, scheme: a.scheme, distance_km: distOf(a),
     dow: a.dow, period: a.period, lead_days: a.lead, procedure: a.proc, chronic_disease: a.chronic, continuing_care: a.cont };
   Object.assign(raw, over || {});
   return M.features.map(c => { if (c in raw) return +raw[c]; const v = Object.keys(raw).filter(k => c.startsWith(k + '_')).sort((x, y) => y.length - x.length)[0]; return v && c === v + '_' + raw[v] ? 1 : 0; });
@@ -225,10 +227,11 @@ function mkAppt(r) {   // r: ค่าดิบจากฟอร์ม/CSV -> �
   const sex = String(r.sex).toUpperCase(); if (!['F', 'M'].includes(sex)) return 'เลือกเพศ';
   if (!MAR_TH[r.marital]) return 'เลือกสถานภาพสมรส'; if (!SCH_TH[r.scheme]) return 'เลือกสิทธิการรักษา'; if (!PROC_TH[r.proc]) return 'เลือกหัตถการ';
   const lead = Math.round(Number(r.lead)); if (!(lead >= 0 && lead <= 365)) return 'วันที่ออกใบนัดต้องไม่หลังวันนัด และไม่เกิน 365 วันก่อนนัด';
+  const dist = Math.round(Number(r.dist) * 10) / 10; if (r.dist === '' || r.dist == null || !(dist >= 0 && dist <= 200)) return 'ระยะทางต้องอยู่ระหว่าง 0–200 กม.';
   const ap = Math.round(Number(r.priorAp)), ns = Math.round(Number(r.priorNs));
   if (!(ap >= 0 && ap <= 500) || !(ns >= 0 && ns <= ap)) return 'จำนวนนัดย้อนหลังไม่ถูกต้อง (ขาดนัดต้องไม่มากกว่านัดทั้งหมด)';
   const idn = id.toUpperCase().startsWith('P') ? id.toUpperCase() : 'P' + id.padStart(4, '0');
-  return { _id: idn + '_' + date, id: idn, date, period: r.period, age, sex, marital: r.marital, scheme: r.scheme, outArea: r.outArea ? 1 : 0, lead, dow, priorNs: ns, priorAp: ap,
+  return { _id: idn + '_' + date, id: idn, date, period: r.period, age, sex, marital: r.marital, scheme: r.scheme, dist, lead, dow, priorNs: ns, priorAp: ap,
     proc: r.proc, chronic: r.chronic ? 1 : 0, cont: r.cont ? 1 : 0 };
 }
 const REV = { scaling: 'scaling', extraction: 'extraction', filling: 'filling', denture: 'denture' };
@@ -237,7 +240,7 @@ function parseCSV(t) {   // รูปแบบเดียวกับ templates
   const h = lines[0].split(',').map(x => x.trim().toLowerCase()), need = ['patient_id', 'appt_date', 'period', 'procedure', 'age', 'sex', 'marital', 'scheme', 'distance_km', 'chronic_disease', 'continuing_care', 'lead_days', 'prior_appts', 'prior_noshows'], miss = need.filter(n => !h.includes(n));
   if (miss.length) return { err: 'ขาดคอลัมน์: ' + miss.join(', ') };
   return { rows: lines.slice(1).map(l => { const c = l.split(',').map(x => x.trim()), g = n => c[h.indexOf(n)];
-    return { id: g('patient_id'), date: g('appt_date'), period: g('period'), proc: REV[g('procedure')], age: g('age'), sex: g('sex'), marital: g('marital'), scheme: g('scheme'), outArea: Number(g('distance_km')) > 8,
+    return { id: g('patient_id'), date: g('appt_date'), period: g('period'), proc: REV[g('procedure')], age: g('age'), sex: g('sex'), marital: g('marital'), scheme: g('scheme'), dist: g('distance_km'),
       lead: g('lead_days'), priorAp: g('prior_appts'), priorNs: g('prior_noshows'), chronic: g('chronic_disease') === '1', cont: g('continuing_care') === '1' }; }) };
 }
 const msg = (el, html, cls) => { const e = $(el); if (e) e.innerHTML = `<p class="msg ${cls}" role="status">${html}</p>`; };
@@ -259,7 +262,7 @@ function renderAdd() {
       <label>ในนั้นขาดนัดกี่ครั้ง<input type="number" id="f-ns" min="0" value="0" inputmode="numeric"></label></div>
     <p class="sec" style="margin-top:14px">ปัจจัยเอื้ออำนวย</p><div class="form">
       <label>สิทธิการรักษา<select id="f-scheme">${opts(SCH_TH)}</select></label>
-      <label>ที่พักอาศัย<select id="f-area"><option value="0">ในเขต รพ.สต.</option><option value="1">นอกเขต</option></select></label>
+      <label>ระยะทางจากที่พักถึง รพ.สต. (กม.)<input type="number" id="f-dist" min="0" max="200" step="0.1" inputmode="decimal" placeholder="เช่น 4.5"></label>
       <label>วันที่ออกใบนัด<input type="date" id="f-issued"></label>
       <label>วันที่นัด<input type="date" id="f-date"></label>
       <label>ช่วงเวลา<select id="f-period"><option value="morning">เช้า 08.30–12.00</option><option value="afternoon">บ่าย</option></select></label></div>
@@ -271,7 +274,7 @@ function renderAdd() {
   const today = new Date().toISOString().slice(0, 10); $('#f-issued').value = today; $('#f-date').value = today;
   $('#f-add').onclick = async () => {
     const g = i => $('#f-' + i).value, issued = g('issued'), date = g('date');
-    const r = mkAppt({ id: g('id'), date, period: g('period'), age: g('age'), sex: g('sex'), marital: g('marital'), scheme: g('scheme'), outArea: g('area') === '1', lead: DATE_RE.test(issued) && DATE_RE.test(date) ? dayDiff(issued, date) : NaN,
+    const r = mkAppt({ id: g('id'), date, period: g('period'), age: g('age'), sex: g('sex'), marital: g('marital'), scheme: g('scheme'), dist: g('dist'), lead: DATE_RE.test(issued) && DATE_RE.test(date) ? dayDiff(issued, date) : NaN,
       priorAp: g('ap'), priorNs: g('ns'), proc: g('proc'), chronic: g('chronic') === '1', cont: g('cont') === '1' });
     if (typeof r === 'string') return msg('#f-msg', esc(r), 'err');
     if (appts.some(x => x._id === r._id)) return msg('#f-msg', 'มีนัดของรหัสนี้ในวันเดียวกันแล้ว', 'err');
@@ -320,7 +323,7 @@ function renderAdminTab() {
         imp: j.importance.slice(0, 12).map(d => ({ f: d.feature, g: d.gini, pm: d.permutation_auc_drop, grp: d.andersen_group })) }); msg('#mdl-msg', 'อัปโหลดผลโมเดลแล้ว', 'ok'); }
     catch (err) { msg('#mdl-msg', 'ไฟล์ไม่ถูกต้อง ต้องเป็น results.json จาก train_model.py', 'err'); } }; fr.readAsText(f); };
 }
-const NM = { continuing_care: 'ความต่อเนื่องของการรักษา', procedure: 'ประเภทหัตถการ', sex: 'เพศ', prior_noshows: 'จำนวนครั้งที่เคยขาดนัด', prior_noshow_rate: 'อัตราขาดนัดสะสม', marital: 'สถานภาพสมรส', period: 'ช่วงเวลานัด', age: 'อายุ', out_area: 'ที่พักนอกเขต', lead_days: 'นัดล่วงหน้า (วัน)', scheme: 'สิทธิการรักษา', dow: 'วันในสัปดาห์', chronic_disease: 'โรคเรื้อรัง' };
+const NM = { continuing_care: 'ความต่อเนื่องของการรักษา', procedure: 'ประเภทหัตถการ', sex: 'เพศ', prior_noshows: 'จำนวนครั้งที่เคยขาดนัด', prior_noshow_rate: 'อัตราขาดนัดสะสม', marital: 'สถานภาพสมรส', period: 'ช่วงเวลานัด', age: 'อายุ', distance_km: 'ระยะทางจากที่พัก', out_area: 'ที่พักนอกเขต', lead_days: 'นัดล่วงหน้า (วัน)', scheme: 'สิทธิการรักษา', dow: 'วันในสัปดาห์', chronic_disease: 'โรคเรื้อรัง' };
 function modelHtml(m) {
   const p = x => (+x).toFixed(2), imp = [...(m.imp || [])].sort((a, b) => b.pm - a.pm).slice(0, 10), mp = Math.max(...imp.map(i => Math.max(i.pm, 0)), 1e-9), mg = Math.max(...imp.map(i => i.g), 1e-9);
   return `<div class="card" style="margin-top:18px"><h2>ประสิทธิภาพโมเดลบนชุดทดสอบ</h2><p class="note">ฝึก ${m.n.train ?? '-'} นัด · ทดสอบ ${m.n.test ?? '-'} นัด</p>

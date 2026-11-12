@@ -1,5 +1,5 @@
-"""Pipeline ตามบทที่ 3: time-based split -> SMOTE (เฉพาะ train) -> Random Forest
--> ประเมินบน test -> feature importance -> จุดตัดความเสี่ยง 3 ระดับจาก validation
+"""Pipeline ตามบทที่ 3: time-based split -> Stratified Group 5-Fold CV ในชุดฝึก (SMOTE เฉพาะส่วนฝึกของแต่ละรอบ)
+-> จุดตัดความเสี่ยง 3 ระดับ -> ฝึก Random Forest บนชุดฝึกทั้งหมด -> ประเมินบน test ครั้งเดียว -> feature importance
 ใช้: python3 train_model.py [ไฟล์.csv]"""
 import sys, json, warnings
 import numpy as np, pandas as pd, joblib
@@ -9,9 +9,10 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import make_pipeline
 from sklearn.neighbors import NearestNeighbors
 from sklearn.inspection import permutation_importance
+from sklearn.model_selection import StratifiedGroupKFold
 from sklearn.metrics import (accuracy_score, precision_score, recall_score, f1_score,
                              roc_auc_score, average_precision_score, brier_score_loss,
-                             confusion_matrix, precision_recall_curve)
+                             confusion_matrix, roc_curve)
 warnings.filterwarnings("ignore")
 SEED = 42
 CSV = sys.argv[1] if len(sys.argv) > 1 else "synthetic_appointments.csv"
@@ -29,7 +30,7 @@ if FULL:   # ชุดขยาย: เพิ่มตัวแปรนอก�
 else:      # ชุดตามเล่ม (ภาคผนวก ก)
     ANDERSEN = {
      "Predisposing": ["age","sex","marital","prior_noshows","prior_noshow_rate"],
-     "Enabling":     ["scheme","out_area","dow","period","lead_days"],
+     "Enabling":     ["scheme","distance_km","dow","period","lead_days"],
      "Need":         ["procedure","chronic_disease","continuing_care"],
     }
     CAT = ["sex","marital","scheme","procedure","period"]
@@ -56,17 +57,14 @@ def metrics(y, p, thr):
 
 df = pd.read_csv(CSV, parse_dates=["appt_date"])
 from schema import derive; df = derive(df)   # เติม dow / prior_noshow_rate หากไฟล์ไม่มี
-df["out_area"] = (df.distance_km > 8).astype(int)   # แทนรหัสหมู่บ้าน ในเขต/นอกเขต
 df = pd.get_dummies(df, columns=CAT, dtype=float)
 feat_cols = [c for c in df.columns if any(c == f or c.startswith(f + "_") for f in ALL)]
 base_of = {c: next(f for f in ALL if c == f or c.startswith(f + "_")) for c in feat_cols}
 
-# ---- Time-based split: train 2023-24 (validation = ครึ่งหลัง 2024), test 2025 ----
+# ---- Time-based split: train 2023-24, test 2025 ----
 yr = df.appt_date.dt.year
-core  = df[(df.appt_date < "2024-07-01")]
-val   = df[(df.appt_date >= "2024-07-01") & (yr == 2024)]
 train = df[yr <= 2024]; test = df[yr == 2025]
-print(f"train={len(train)}  (val={len(val)})  test={len(test)} | no-show rate train={train.no_show.mean():.3f} test={test.no_show.mean():.3f}")
+print(f"train={len(train)}  test={len(test)} | no-show rate train={train.no_show.mean():.3f} test={test.no_show.mean():.3f}")
 
 def fit_rf(X, y, balance, rng):
     if balance == "smote": X, y = smote(X, y, rng); cw = None
@@ -75,22 +73,25 @@ def fit_rf(X, y, balance, rng):
                                   class_weight=cw, n_jobs=-1, random_state=SEED).fit(X, y)
 
 rng = np.random.default_rng(SEED)
-res = {"n": dict(train=len(train), val=len(val), test=len(test)), "models": {}}
-
-# ---- 1) เลือกจุดตัดจาก validation (โมเดลฝึกบน core เท่านั้น) ----
-m_val = fit_rf(core[feat_cols].values, core.no_show.values, "smote", np.random.default_rng(SEED))
-pv = m_val.predict_proba(val[feat_cols].values)[:, 1]
-pr, rc, th = precision_recall_curve(val.no_show, pv)
-f1s = 2 * pr[:-1] * rc[:-1] / (pr[:-1] + rc[:-1] + 1e-9)
-thr_high = float(th[f1s.argmax()])                      # สูง: จุดที่ F1 สูงสุด
-ok = th[rc[:-1] >= 0.90]; thr_low = float(ok.max()) if len(ok) else float(th.min())  # ต่ำ: ยังจับ no-show ได้ >=90%
-thr_low = min(thr_low, thr_high)
-res["risk_cutoffs"] = dict(low_below=thr_low, high_from=thr_high)
-print(f"cutoffs (validation): low<{thr_low:.3f}  high>={thr_high:.3f}")
-
-# ---- 2) ฝึกโมเดลสุดท้ายบน train เต็ม -> ประเมินบน test ----
 Xtr, ytr = train[feat_cols].values, train.no_show.values
 Xte, yte = test[feat_cols].values, test.no_show.values
+res = {"n": dict(train=len(train), test=len(test), cv_folds=5), "models": {}}
+
+# ---- 1) ตรวจสอบภายในชุดฝึก: Stratified Group 5-Fold (กลุ่ม = ผู้ป่วย) SMOTE เฉพาะส่วนฝึกของแต่ละรอบ ----
+RED_SHARE_MAX = 0.20   # ภาระงาน: กลุ่มเสี่ยงสูงไม่เกินร้อยละ 20 ของนัด (ปรับได้ตามกำลังคนของหน่วยบริการ)
+oof = np.zeros(len(train))
+for k, (a, b) in enumerate(StratifiedGroupKFold(5, shuffle=True, random_state=SEED).split(Xtr, ytr, groups=train.patient_id.values)):
+    assert not set(train.patient_id.values[a]) & set(train.patient_id.values[b])
+    oof[b] = fit_rf(Xtr[a], ytr[a], "smote", np.random.default_rng(SEED + k)).predict_proba(Xtr[b])[:, 1]
+fpr, tpr, th = roc_curve(ytr, oof); th = np.clip(th, 0, 1)
+thr_youden = float(th[(tpr - fpr).argmax()])                     # สมดุลความไว-ความจำเพาะ
+thr_high = max(thr_youden, float(np.quantile(oof, 1 - RED_SHARE_MAX)))   # ร่วมกับภาระงานของบุคลากร
+thr_low = min(float(th[tpr >= 0.90].max()), thr_high)            # ต่ำ: ยังจับผู้ขาดนัดได้อย่างน้อยร้อยละ 90
+res["cv"] = dict(auc=float(roc_auc_score(ytr, oof)), youden=thr_youden, red_share_max=RED_SHARE_MAX)
+res["risk_cutoffs"] = dict(low_below=thr_low, high_from=thr_high)
+print(f"CV AUC={res['cv']['auc']:.3f} | cutoffs: low<{thr_low:.3f}  high>={thr_high:.3f} (Youden={thr_youden:.3f})")
+
+# ---- 2) ฝึกโมเดลสุดท้ายบน train เต็ม -> ประเมินบน test ครั้งเดียว ----
 variants = {"RF + SMOTE (ตามโครงร่าง)": ("smote", None), "RF + class_weight": ("weight", None), "RF (ไม่ปรับสมดุล)": ("none", None)}
 models = {}
 for name, (bal, _) in variants.items():
@@ -99,7 +100,7 @@ for name, (bal, _) in variants.items():
     res["models"][name] = metrics(yte, p, thr_high if bal == "smote" else 0.5)
 lr = make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000, class_weight="balanced")).fit(Xtr, ytr)
 res["models"]["Logistic regression (baseline)"] = metrics(yte, lr.predict_proba(Xte)[:, 1], 0.5)
-# สำหรับ RF+SMOTE รายงานที่ 0.5 ด้วย เพื่อเทียบกับจุดตัดจาก validation
+# สำหรับ RF+SMOTE รายงานที่ 0.5 ด้วย เพื่อเทียบกับจุดตัดจากการตรวจสอบภายใน
 final = models["RF + SMOTE (ตามโครงร่าง)"]; pte = final.predict_proba(Xte)[:, 1]
 res["models"]["RF + SMOTE @0.5"] = metrics(yte, pte, 0.5)
 
@@ -134,7 +135,7 @@ def tree_json(est):
     leaf = tr.children_left == -1
     return dict(f=[-1 if l else int(f) for l, f in zip(leaf, tr.feature)], t=[round(float(x), 4) for x in tr.threshold],
                 l=[int(x) for x in tr.children_left], r=[int(x) for x in tr.children_right], v=[round(float(x), 4) for x in p1])
-raw = pd.read_csv(CSV, parse_dates=["appt_date"]); raw = derive(raw); raw["out_area"] = (raw.distance_km > 8).astype(int)
+raw = pd.read_csv(CSV, parse_dates=["appt_date"]); raw = derive(raw)
 ref = {}
 for f in ALL:
     ref[f] = (str(raw[f].mode().iloc[0]) if f in CAT else float(raw[f].median())) if f in raw else 0

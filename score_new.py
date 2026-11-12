@@ -16,7 +16,7 @@ if a.history:
 E, W = validate(df, training=False)
 for w in W: print("[คำเตือน]", w)
 if E: sys.exit("ไฟล์ไม่ผ่านการตรวจ:\n  " + "\n  ".join(E))
-df = derive(df); df["out_area"] = (df.distance_km > 8).astype(int)
+df = derive(df)
 m = joblib.load("model.joblib"); X = pd.get_dummies(df, columns=list(ENUMS), dtype=float).reindex(columns=m["features"], fill_value=0.0)
 p = m["model"].predict_proba(X.values)[:, 1]; cut = m["cutoffs"]
 out = pd.DataFrame({"patient_id": df.patient_id, "appt_date": df.appt_date.dt.strftime("%Y-%m-%d"), "period": df.period,
