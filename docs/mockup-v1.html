@@ -1,0 +1,387 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>ระบบเตือนนัดทันตกรรม</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: ตารางนัดรายวันทางซ้าย + แผงรายละเอียดผู้ป่วยทางขวา (มือถือ: แผงเลื่อนลงใต้รายการ) */
+:root{
+  --bg:#f3f5f6; --surface:#ffffff; --surface2:#eaeff1; --line:#d6dde0; --fg:#18242b; --muted:#5a6b74;
+  --accent:#17566e; --accent-fg:#ffffff; --accent-soft:#dcebf1;
+  --hi:#b3261e; --hi-bg:#fbe3e0; --mid:#8a5a00; --mid-bg:#fbefcf; --lo:#1d6b3a; --lo-bg:#dcf1e2;
+  --font:'IBM Plex Sans Thai','Noto Sans Thai',system-ui,sans-serif; --mono:'IBM Plex Mono',ui-monospace,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f1a1f; --surface:#17252c; --surface2:#1e2f37; --line:#2c424c; --fg:#e6eef1; --muted:#97aab3;
+  --accent:#6cc0dc; --accent-fg:#06222d; --accent-soft:#1b3a47;
+  --hi:#ff8f86; --hi-bg:#44211f; --mid:#f0c35c; --mid-bg:#40330f; --lo:#7fd69a; --lo-bg:#173a25; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1a1f; --surface:#17252c; --surface2:#1e2f37; --line:#2c424c; --fg:#e6eef1; --muted:#97aab3;
+  --accent:#6cc0dc; --accent-fg:#06222d; --accent-soft:#1b3a47;
+  --hi:#ff8f86; --hi-bg:#44211f; --mid:#f0c35c; --mid-bg:#40330f; --lo:#7fd69a; --lo-bg:#173a25; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--font);font-size:15px;line-height:1.55;
+  padding-block:20px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+header{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:flex-end;justify-content:space-between}
+h1{font-size:1.5rem;line-height:1.25;margin:0;font-weight:700;text-wrap:balance}
+.sub{color:var(--muted);margin:2px 0 0;font-size:.9rem}
+.badge{font-size:.78rem;font-weight:600;padding:4px 10px;border-radius:4px;background:var(--mid-bg);color:var(--mid);white-space:nowrap}
+nav.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line)}
+nav.tabs button{font:inherit;font-weight:500;background:none;border:0;color:var(--muted);padding:10px 16px;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-1px}
+nav.tabs button[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.sum{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.sum button{font:inherit;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:12px 14px;cursor:pointer;color:var(--fg);display:flex;flex-direction:column;gap:2px}
+.sum button[aria-pressed="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.sum .n{font-size:1.8rem;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums}
+.sum .l{font-size:.85rem;color:var(--muted)}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:baseline}
+.hi{--c:var(--hi);--cb:var(--hi-bg)}.medium{--c:var(--mid);--cb:var(--mid-bg)}.low{--c:var(--lo);--cb:var(--lo-bg)}
+.high{--c:var(--hi);--cb:var(--hi-bg)}
+.dot{background:var(--c)}
+.main{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:18px;align-items:start}
+@media(max-width:820px){.main{grid-template-columns:minmax(0,1fr)}}
+.day{margin-bottom:14px}
+.day h3{margin:0 0 6px;font-size:.85rem;font-weight:600;color:var(--muted);letter-spacing:.02em}
+.list{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:6px;background:var(--surface);overflow:hidden}
+.row{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px 14px;border:0;border-bottom:1px solid var(--line);background:none;font:inherit;color:inherit;text-align:left;cursor:pointer;width:100%}
+.row:last-child{border-bottom:0}
+.row:hover{background:var(--surface2)}
+.row[aria-current="true"]{background:var(--accent-soft)}
+.row .t{font-size:.8rem;color:var(--muted)}
+.row .id{font-family:var(--mono);font-weight:500}
+.row .meta{display:block;font-size:.85rem;color:var(--muted)}
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:4px;padding:3px 9px;font-size:.82rem;font-weight:600;background:var(--cb);color:var(--c);white-space:nowrap}
+.pill b{font-family:var(--mono);font-weight:500}
+.done-mark{font-size:.75rem;color:var(--lo);font-weight:600;display:block;text-align:right}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:18px;display:flex;flex-direction:column;gap:14px;position:sticky;top:12px}
+@media(max-width:820px){.panel{position:static}}
+.panel h2{margin:0;font-size:1.15rem}
+.kv{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 16px;margin:0}
+.kv div{min-width:0}.kv dt{font-size:.78rem;color:var(--muted)}.kv dd{margin:0;font-weight:500}
+.reasons{margin:0;padding-left:1.2em}.reasons li{margin:2px 0}
+.sec{font-size:.78rem;font-weight:600;color:var(--muted);letter-spacing:.04em;margin:0 0 6px}
+.gauge{height:8px;border-radius:4px;background:var(--surface2);position:relative;overflow:hidden}
+.gauge i{position:absolute;inset:0 auto 0 0;background:var(--c);border-radius:4px}
+.act{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--line)}
+.act input{width:20px;height:20px;margin-top:2px;accent-color:var(--accent);flex:none}
+.act label{cursor:pointer}
+.act input:checked + label{color:var(--muted);text-decoration:line-through}
+.note{font-size:.82rem;color:var(--muted);margin:0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:18px}
+.card h2{font-size:1.05rem;margin:0 0 4px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px}
+.mets{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin-top:12px}
+.mets div{background:var(--surface2);border-radius:4px;padding:10px 12px}
+.mets .v{font-size:1.4rem;font-weight:700;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.mets .k{font-size:.78rem;color:var(--muted)}
+.bar{display:grid;grid-template-columns:minmax(90px,130px) minmax(0,1fr) 52px;gap:10px;align-items:center;margin:7px 0;font-size:.88rem}
+.bar .track{height:14px;background:var(--surface2);border-radius:3px;overflow:hidden}
+.bar .fill{height:100%;border-radius:3px}
+.bar .num{font-family:var(--mono);font-size:.8rem;text-align:right;color:var(--muted)}
+.g-Predisposing{background:var(--accent)}.g-Enabling{background:var(--mid)}.g-Need{background:var(--lo)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:.82rem;color:var(--muted);margin:6px 0 4px}
+.legend span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;background:var(--c)}
+.risk3{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.footer{font-size:.82rem;color:var(--muted)}
+@media(prefers-reduced-motion:no-preference){.gauge i,.bar .fill{transition:width .3s}}
+
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--surface)}
+.seg button{font:inherit;font-size:.88rem;font-weight:500;border:0;background:none;color:var(--muted);padding:7px 14px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-fg)}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px 12px;margin-top:10px}
+.form label{display:flex;flex-direction:column;gap:3px;font-size:.8rem;color:var(--muted)}
+input[type=text],input[type=date],input[type=number],select,textarea{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:7px 9px;min-width:0;width:100%}
+textarea{font-family:var(--mono);font-size:.8rem;min-height:110px;resize:vertical}
+.btn{font:inherit;font-weight:600;border-radius:5px;padding:8px 16px;cursor:pointer;border:1px solid var(--accent);background:var(--accent);color:var(--accent-fg)}
+.btn.sec2{background:none;color:var(--accent)}
+.btn.sm{padding:5px 12px;font-size:.85rem}
+.btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.msg{font-size:.88rem;margin:10px 0 0;padding:8px 12px;border-radius:4px;background:var(--surface2)}
+.msg.err{background:var(--hi-bg);color:var(--hi)}.msg.ok{background:var(--lo-bg);color:var(--lo)}
+code.block{display:block;white-space:pre;overflow-x:auto;background:var(--surface2);padding:10px 12px;border-radius:4px;font-family:var(--mono);font-size:.78rem;margin:8px 0 0}
+.outc{display:flex;gap:8px}
+.outc button{flex:1;font:inherit;padding:8px;border-radius:5px;border:1px solid var(--line);background:var(--bg);color:var(--fg);cursor:pointer}
+.outc button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);font-weight:600}
+.cutrow{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:10px}
+.tag{font-size:.72rem;font-weight:600;padding:2px 7px;border-radius:3px;background:var(--accent-soft);color:var(--accent);margin-left:6px;vertical-align:middle}
+.chats{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-top:14px}
+.chat{background:var(--surface2);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.chat h3{margin:0;font-size:.9rem}.chat .why{font-size:.78rem;color:var(--muted);margin:0}
+.bub{background:var(--surface);border:1px solid var(--line);border-radius:4px 14px 14px 14px;padding:10px 12px;white-space:pre-line;font-size:.9rem;overflow-wrap:anywhere}
+.qr{display:flex;flex-wrap:wrap;gap:6px}.qr span{border:1px solid var(--accent);color:var(--accent);background:var(--accent-soft);border-radius:14px;padding:3px 12px;font-size:.82rem;font-weight:500}
+.skip{font-size:.85rem;color:var(--muted);padding:10px 0}
+</style>
+
+<style>body{margin:0}[hidden]{display:none!important}img{max-width:100%}</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div>
+    <h1>ระบบเตือนนัดทันตกรรม ผู้สูงอายุ</h1>
+    <p class="sub">ภาพจำลองระบบสนับสนุนการตัดสินใจเชิงรุก · รพ.สต.บ้านเตาถ่าน</p>
+  </div>
+  <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+    <div class="seg" role="group" aria-label="บทบาทผู้ใช้"><button id="r-staff" aria-pressed="true">เจ้าหน้าที่</button><button id="r-admin" aria-pressed="false">แอดมิน</button></div>
+    <span class="badge">ข้อมูลจำลอง ไม่ใช่ผู้ป่วยจริง</span>
+  </div>
+</header>
+
+<nav class="tabs" role="tablist" id="tabs"></nav>
+
+<section id="v-q" role="tabpanel" style="display:flex;flex-direction:column;gap:18px">
+  <div class="sum" id="sum"></div>
+  <div class="main"><div id="queue"></div><aside class="panel" id="panel" aria-live="polite"></aside></div>
+</section>
+
+<section id="v-l" role="tabpanel" hidden>
+  <div class="card">
+    <h2>ตัวอย่างข้อความแจ้งเตือนทาง LINE <span class="tag">ยังไม่ส่งจริง</span></h2>
+    <p class="note">ใช้นัดสมมติเท่านั้น ข้อความถึงผู้ป่วยไม่แสดงระดับความเสี่ยง ผู้รับแต่ละกลุ่มได้ข้อความต่างกันตามระดับของนัดที่เลือก</p>
+    <div class="form" style="grid-template-columns:minmax(0,420px)"><label>เลือกนัดตัวอย่าง<select id="l-sel"></select></label></div>
+    <div class="chats" id="l-body"></div>
+  </div>
+</section>
+
+<section id="v-i" role="tabpanel" hidden>
+  <div class="grid2">
+    <div class="card">
+      <h2>เพิ่มนัดหมายทีละราย</h2>
+      <p class="note">ใช้รหัสวิจัยเท่านั้น ห้ามกรอกชื่อ-นามสกุลหรือเลขบัตรประชาชน</p>
+      <div class="form">
+        <label>รหัสผู้ป่วย<input type="text" id="f-id" placeholder="P0123" autocomplete="off"></label>
+        <label>วันที่นัด<input type="date" id="f-date"></label>
+        <label>ช่วงเวลา<select id="f-period"><option value="morning">เช้า</option><option value="afternoon">บ่าย</option></select></label>
+        <label>หัตถการ<select id="f-proc"><option>ขูดหินปูน</option><option>ถอนฟัน</option><option>อุดฟัน</option><option>ฟันเทียม</option><option>รักษาปริทันต์</option></select></label>
+        <label>อายุ (ปี)<input type="number" id="f-age" min="60" max="110" value="70"></label>
+        <label>เพศ<select id="f-sex"><option value="F">หญิง</option><option value="M">ชาย</option></select></label>
+        <label>คะแนนความเสี่ยง (0–100)<input type="number" id="f-score" min="0" max="100" value="20"></label>
+      </div>
+      <div class="btns"><button class="btn" id="f-add">เพิ่มเข้าคิว</button></div>
+      <div id="f-msg"></div>
+    </div>
+    <div class="card">
+      <h2>นำเข้าหลายรายจากไฟล์ CSV</h2>
+      <p class="note">คะแนนความเสี่ยงคำนวณจากโมเดลที่ผู้วิจัยรันแยก หน้านี้ไม่คำนวณคะแนนเอง</p>
+      <code class="block">patient_id,appt_date,period,procedure,age,sex,risk_score
+P0123,2026-11-03,morning,ขูดหินปูน,72,F,41
+P0456,2026-11-03,afternoon,ถอนฟัน,68,M,12</code>
+      <div class="form" style="grid-template-columns:1fr"><label>เลือกไฟล์ .csv<input type="file" id="c-file" accept=".csv,text/csv"></label>
+      <label>หรือวางข้อความ CSV<textarea id="c-text" placeholder="patient_id,appt_date,period,procedure,age,sex,risk_score"></textarea></label></div>
+      <div class="btns"><button class="btn" id="c-go">นำเข้า</button><button class="btn sec2" id="c-clear">ล้างนัดที่นำเข้าทั้งหมด</button></div>
+      <div id="c-msg"></div>
+    </div>
+  </div>
+</section>
+
+<section id="v-m" role="tabpanel" hidden>
+  <div class="grid2">
+    <div class="card">
+      <h2>จุดตัดระดับความเสี่ยง</h2>
+      <p class="note">กำหนดจากชุด Validation ปรับได้เพื่อทดลองดูผลต่อจำนวนนัดในแต่ละสี</p>
+      <div class="cutrow">
+        <label class="note">เสี่ยงสูงเริ่มที่คะแนน<input type="number" id="cut-high" min="1" max="100"></label>
+        <label class="note">เสี่ยงต่ำต่ำกว่าคะแนน<input type="number" id="cut-low" min="0" max="99"></label>
+      </div>
+      <div class="btns"><button class="btn sec2 sm" id="cut-reset">คืนค่าจากโมเดล</button></div>
+      <div id="cut-sum" class="note" style="margin-top:10px"></div>
+    </div>
+    <div class="card">
+      <h2>ผลการมา/ขาดนัดที่บันทึกโดยเจ้าหน้าที่</h2>
+      <p class="note">ใช้ตรวจว่าระดับความเสี่ยงตรงกับผลจริงหรือไม่</p>
+      <div id="outc-sum" class="risk3"></div>
+    </div>
+  </div>
+  <div class="grid2" style="margin-top:18px">
+    <div class="card">
+      <h2>ประสิทธิภาพบนชุดทดสอบ (ปี 2568)</h2>
+      <p class="note" id="nsplit"></p>
+      <div class="mets" id="mets"></div>
+      <p class="note" style="margin-top:12px">คะแนนความเสี่ยงเป็นอันดับเปรียบเทียบ ไม่ใช่ความน่าจะเป็นที่ปรับเทียบแล้ว เพราะโมเดลฝึกด้วย SMOTE</p>
+    </div>
+    <div class="card">
+      <h2>ผลจัดกลุ่ม 3 ระดับบนชุดทดสอบ</h2>
+      <p class="note">อัตราขาดนัดจริงของแต่ละกลุ่ม ที่จุดตัดจากโมเดล</p>
+      <div class="risk3" id="risk3"></div>
+    </div>
+  </div>
+  <div class="card" style="margin-top:18px">
+    <h2>ความสำคัญของปัจจัยตามกรอบ Andersen</h2>
+    <p class="note">แถบบน = Permutation (AUC ที่ลดลงเมื่อสลับตัวแปร) · แถบล่าง = Gini importance</p>
+    <div class="legend" id="legend"></div>
+    <div id="imp"></div>
+  </div>
+</section>
+
+<p class="footer">บทบาทเจ้าหน้าที่/แอดมินในหน้านี้เป็นการสาธิตการแบ่งหน้าจอ ไม่มีระบบล็อกอินจริง ข้อมูลที่เพิ่มหรือบันทึกเก็บในเบราว์เซอร์เครื่องนี้เท่านั้น ข้อมูลตั้งต้นเป็นข้อมูลจำลอง ใช้กับระยะที่ 3 (R2) ของงานวิจัยเท่านั้น</p>
+</div>
+
+<script>
+const D = {"appts": [{"id": "P0781", "date": "2025-06-23", "period": "morning", "age": 70, "sex": "M", "proc": "ขูดหินปูน", "outArea": 0, "scheme": "บัตรทอง", "marital": "สมรส", "lead": 7, "prior": 9, "priorNs": 1, "p": 0.3684, "level": "high", "reasons": ["เคยขาดนัด 1 ครั้ง จาก 9 นัด", "นัดวันจันทร์"]}, {"id": "P0724", "date": "2025-06-23", "period": "morning", "age": 60, "sex": "F", "proc": "อุดฟัน", "outArea": 0, "scheme": "ข้าราชการ", "marital": "หม้าย", "lead": 7, "prior": 4, "priorNs": 0, "p": 0.0796, "level": "medium", "reasons": ["นัดวันจันทร์"]}, {"id": "P0844", "date": "2025-06-23", "period": "morning", "age": 69, "sex": "F", "proc": "ขูดหินปูน", "outArea": 0, "scheme": "บัตรทอง", "marital": "สมรส", "lead": 21, "prior": 4, "priorNs": 0, "p": 0.0569, "level": "low", "reasons": ["นัดวันจันทร์"]}, {"id": "P0258", "date": "2025-06-23", "period": "morning", "age": 67, "sex": "M", "proc": "อุดฟัน", "outArea": 0, "scheme": "บัตรทอง", "marital": "สมรส", "lead": 7, "prior": 2, "priorNs": 0, "p": 0.057, "level": "low", "reasons": ["นัดวันจันทร์"]}, {"id": "P0650", "date": "2025-06-23", "period": "morning", "age": 67, "sex": "F", "proc": "อุดฟัน", "outArea": 1, "scheme": "บัตรทอง", "marital": "สมรส", "lead": 14, "prior": 0, "priorNs": 0, "p": 0.0645, "level": "low", "reasons": ["ที่พักอยู่นอกเขต รพ.สต.", "นัดวันจันทร์"]}, {"id": "P0219", "date": "2025-06-24", "period": "morning", "age": 69, "sex": "F", "proc": "ถอนฟัน", "outArea": 0, "scheme": "บัตรทอง", "marital": "หย่าร้าง", "lead": 30, "prior": 3, "priorNs": 0, "p": 0.0637, "level": "low", "reasons": ["นัดล่วงหน้านาน 30 วัน"]}, {"id": "P0514", "date": "2025-06-24", "period": "morning", "age": 69, "sex": "F", "proc": "อุดฟัน", "outArea": 0, "scheme": "ประกันสังคม", "marital": "สมรส", "lead": 14, "prior": 1, "priorNs": 1, "p": 0.3902, "level": "high", "reasons": ["เคยขาดนัด 1 ครั้ง จาก 1 นัด"]}, {"id": "P0261", "date": "2025-06-25", "period": "afternoon", "age": 68, "sex": "M", "proc": "ขูดหินปูน", "outArea": 0, "scheme": "บัตรทอง", "marital": "หม้าย", "lead": 3, "prior": 1, "priorNs": 0, "p": 0.0412, "level": "low", "reasons": []}, {"id": "P0513", "date": "2025-06-25", "period": "morning", "age": 71, "sex": "F", "proc": "ฟันเทียม", "outArea": 0, "scheme": "บัตรทอง", "marital": "หม้าย", "lead": 45, "prior": 1, "priorNs": 0, "p": 0.07, "level": "low", "reasons": ["นัดล่วงหน้านาน 45 วัน"]}, {"id": "P0480", "date": "2025-06-25", "period": "morning", "age": 88, "sex": "M", "proc": "ฟันเทียม", "outArea": 0, "scheme": "บัตรทอง", "marital": "สมรส", "lead": 7, "prior": 3, "priorNs": 0, "p": 0.1233, "level": "medium", "reasons": []}, {"id": "P0668", "date": "2025-06-26", "period": "afternoon", "age": 73, "sex": "F", "proc": "ถอนฟัน", "outArea": 0, "scheme": "บัตรทอง", "marital": "สมรส", "lead": 14, "prior": 7, "priorNs": 2, "p": 0.1919, "level": "medium", "reasons": ["เคยขาดนัด 2 ครั้ง จาก 7 นัด"]}, {"id": "P0481", "date": "2025-06-26", "period": "afternoon", "age": 72, "sex": "M", "proc": "อุดฟัน", "outArea": 0, "scheme": "บัตรทอง", "marital": "สมรส", "lead": 30, "prior": 4, "priorNs": 1, "p": 0.2405, "level": "medium", "reasons": ["เคยขาดนัด 1 ครั้ง จาก 4 นัด", "นัดล่วงหน้านาน 30 วัน"]}, {"id": "P0720", "date": "2025-06-26", "period": "morning", "age": 63, "sex": "F", "proc": "อุดฟัน", "outArea": 0, "scheme": "บัตรทอง", "marital": "สมรส", "lead": 45, "prior": 4, "priorNs": 1, "p": 0.3176, "level": "high", "reasons": ["เคยขาดนัด 1 ครั้ง จาก 4 นัด", "นัดล่วงหน้านาน 45 วัน"]}, {"id": "P0824", "date": "2025-06-26", "period": "morning", "age": 60, "sex": "F", "proc": "ขูดหินปูน", "outArea": 0, "scheme": "ประกันสังคม", "marital": "หย่าร้าง", "lead": 45, "prior": 5, "priorNs": 0, "p": 0.1791, "level": "medium", "reasons": ["นัดล่วงหน้านาน 45 วัน"]}, {"id": "P0093", "date": "2025-06-26", "period": "morning", "age": 67, "sex": "M", "proc": "ขูดหินปูน", "outArea": 0, "scheme": "บัตรทอง", "marital": "สมรส", "lead": 14, "prior": 5, "priorNs": 0, "p": 0.0255, "level": "low", "reasons": []}, {"id": "P0611", "date": "2025-06-26", "period": "morning", "age": 63, "sex": "F", "proc": "อุดฟัน", "outArea": 0, "scheme": "บัตรทอง", "marital": "สมรส", "lead": 14, "prior": 3, "priorNs": 0, "p": 0.158, "level": "medium", "reasons": []}, {"id": "P0840", "date": "2025-06-27", "period": "afternoon", "age": 68, "sex": "M", "proc": "ถอนฟัน", "outArea": 0, "scheme": "ประกันสังคม", "marital": "สมรส", "lead": 7, "prior": 1, "priorNs": 0, "p": 0.0998, "level": "medium", "reasons": []}, {"id": "P0563", "date": "2025-06-27", "period": "morning", "age": 70, "sex": "F", "proc": "อุดฟัน", "outArea": 0, "scheme": "ประกันสังคม", "marital": "หม้าย", "lead": 30, "prior": 0, "priorNs": 0, "p": 0.1421, "level": "medium", "reasons": ["นัดล่วงหน้านาน 30 วัน"]}, {"id": "P0807", "date": "2025-06-27", "period": "morning", "age": 69, "sex": "F", "proc": "อุดฟัน", "outArea": 0, "scheme": "ข้าราชการ", "marital": "หม้าย", "lead": 3, "prior": 2, "priorNs": 0, "p": 0.0722, "level": "low", "reasons": []}, {"id": "P0087", "date": "2025-06-28", "period": "afternoon", "age": 67, "sex": "F", "proc": "ถอนฟัน", "outArea": 0, "scheme": "บัตรทอง", "marital": "หม้าย", "lead": 3, "prior": 5, "priorNs": 3, "p": 0.2126, "level": "medium", "reasons": ["เคยขาดนัด 3 ครั้ง จาก 5 นัด"]}, {"id": "P0419", "date": "2025-06-28", "period": "morning", "age": 70, "sex": "M", "proc": "ถอนฟัน", "outArea": 0, "scheme": "บัตรทอง", "marital": "หม้าย", "lead": 7, "prior": 2, "priorNs": 0, "p": 0.0563, "level": "low", "reasons": []}, {"id": "P0812", "date": "2025-06-28", "period": "morning", "age": 66, "sex": "M", "proc": "ขูดหินปูน", "outArea": 0, "scheme": "บัตรทอง", "marital": "โสด", "lead": 21, "prior": 4, "priorNs": 0, "p": 0.1206, "level": "medium", "reasons": []}, {"id": "P0749", "date": "2025-06-28", "period": "morning", "age": 67, "sex": "M", "proc": "อุดฟัน", "outArea": 0, "scheme": "ประกันสังคม", "marital": "สมรส", "lead": 45, "prior": 5, "priorNs": 0, "p": 0.3071, "level": "high", "reasons": ["นัดล่วงหน้านาน 45 วัน"]}, {"id": "P0598", "date": "2025-06-29", "period": "morning", "age": 76, "sex": "F", "proc": "อุดฟัน", "outArea": 0, "scheme": "ประกันสังคม", "marital": "หม้าย", "lead": 7, "prior": 7, "priorNs": 1, "p": 0.283, "level": "high", "reasons": ["เคยขาดนัด 1 ครั้ง จาก 7 นัด"]}], "cut": {"low_below": 0.07854125320204922, "high_from": 0.2624055271681035}, "metrics": {"accuracy": 0.7946360153256705, "precision": 0.3029197080291971, "recall": 0.51875, "f1": 0.3824884792626728, "auc": 0.6889519650655023, "pr_auc": 0.2713703949631703, "brier": 0.10453213633482575, "tn": 954, "fp": 191, "fn": 77, "tp": 83, "threshold": 0.2624055271681035}, "risk": {"high": {"n": 274, "noshow_rate": 0.3029197080291971}, "medium": {"n": 741, "noshow_rate": 0.07557354925775979}, "low": {"n": 290, "noshow_rate": 0.07241379310344828}}, "n": {"train": 2547, "val": 683, "test": 1305}, "imp": [{"f": "procedure", "g": 0.2103178693935166, "pm": 0.020185589519651014, "grp": "Need"}, {"f": "marital", "g": 0.12600695559695263, "pm": 0.020706331877729592, "grp": "Predisposing"}, {"f": "continuing_care", "g": 0.1093507000010823, "pm": 0.011015283842794843, "grp": "Need"}, {"f": "period", "g": 0.09738676285217739, "pm": 0.009532023289665351, "grp": "Enabling"}, {"f": "prior_noshows", "g": 0.09209110796260407, "pm": 0.010681222707423681, "grp": "Predisposing"}, {"f": "sex", "g": 0.09031182340186028, "pm": 0.016995633187773078, "grp": "Predisposing"}, {"f": "prior_noshow_rate", "g": 0.07953861561913002, "pm": 0.07175655021834074, "grp": "Predisposing"}, {"f": "chronic_disease", "g": 0.05770929017001744, "pm": 0.006060407569141272, "grp": "Need"}, {"f": "scheme", "g": 0.04155805369052428, "pm": 0.0012958515283844803, "grp": "Enabling"}, {"f": "age", "g": 0.036697978544271696, "pm": -0.0006017103347888557, "grp": "Predisposing"}, {"f": "dow", "g": 0.02532676277619227, "pm": -0.0010485807860261135, "grp": "Enabling"}, {"f": "lead_days", "g": 0.023935081103987454, "pm": -0.0021539301310042965, "grp": "Enabling"}, {"f": "out_area", "g": 0.009768998887683645, "pm": 0.002538209606986978, "grp": "Enabling"}]};
+const LV = {high:'เสี่ยงสูง',medium:'เสี่ยงปานกลาง',low:'เสี่ยงต่ำ'};
+const ACTIONS = {
+  high:['ประสาน อสม. ประจำคุ้มบ้านเยี่ยมบ้านก่อนวันนัด','โทรประสานญาติหรือผู้ดูแลเพื่อยืนยันการมา','ประสานรถรับส่งในชุมชน หากเดินทางลำบาก'],
+  medium:['โทรติดตามผู้ดูแลล่วงหน้า 2–3 วัน','ประเมินความพร้อมและยืนยันการเดินทาง'],
+  low:['ส่ง SMS แจ้งเตือนอัตโนมัติก่อนวันนัด']
+};
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const PROCS = ['ขูดหินปูน','ถอนฟัน','อุดฟัน','ฟันเทียม','รักษาปริทันต์'];
+// ---- สถานะ (เก็บในเบราว์เซอร์นี้เท่านั้น) ----
+const DEF_CUT = {low:Math.round(D.cut.low_below*100), high:Math.round(D.cut.high_from*100)};
+let S = {added:[], cut:{...DEF_CUT}, done:{}, outcome:{}};
+try{const raw=localStorage.getItem('sda-v1'); if(raw){const p=JSON.parse(raw); S={...S,...p};}}catch(e){}
+const save=()=>{try{localStorage.setItem('sda-v1',JSON.stringify(S))}catch(e){}};
+let role='staff', tab='q', filter=null, sel=null;
+const all = () => D.appts.concat(S.added);
+const score = a => Math.round(a.p*100);
+const lvl = a => { const v=score(a); return v>=S.cut.high?'high':v>=S.cut.low?'medium':'low'; };
+const key = a => a.id+a.date;
+const fmtDay = s => new Date(s+'T00:00:00').toLocaleDateString('th-TH',{weekday:'long',day:'numeric',month:'short',year:'numeric'});
+const isDone = a => ACTIONS[lvl(a)].every((_,i)=>S.done[key(a)+i]);
+
+// ---- แท็บตามบทบาท ----
+const TABS = {staff:[['q','คิวนัดหมาย'],['l','ข้อความ LINE']], admin:[['q','คิวนัดหมาย'],['l','ข้อความ LINE'],['i','นำเข้านัดหมาย'],['m','จุดตัดและโมเดล']]};
+function renderTabs(){
+  if(!TABS[role].some(t=>t[0]===tab)) tab='q';
+  $('#tabs').innerHTML = TABS[role].map(([k,l])=>`<button role="tab" data-t="${k}" aria-selected="${tab===k}">${l}</button>`).join('');
+  document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>{tab=b.dataset.t;renderTabs();});
+  ['q','l','i','m'].forEach(k=>{$('#v-'+k).hidden = tab!==k;});
+  if(tab==='m') renderAdmin();
+  if(tab==='l') renderLine();
+  $('#r-staff').setAttribute('aria-pressed',role==='staff'); $('#r-admin').setAttribute('aria-pressed',role==='admin');
+}
+$('#r-staff').onclick=()=>{role='staff';renderTabs();renderPanel();};
+$('#r-admin').onclick=()=>{role='admin';renderTabs();renderPanel();};
+
+// ---- คิวนัด (ทั้งสองบทบาท) ----
+function renderSum(){
+  const c={high:0,medium:0,low:0}; all().forEach(a=>c[lvl(a)]++);
+  $('#sum').innerHTML = `<button data-f="" aria-pressed="${filter===null}"><span class="n">${all().length}</span><span class="l">นัดทั้งหมดในคิว</span></button>` +
+    ['high','medium','low'].map(l=>`<button class="${l}" data-f="${l}" aria-pressed="${filter===l}"><span class="n">${c[l]}</span><span class="l"><i class="dot"></i>${LV[l]}</span></button>`).join('');
+  document.querySelectorAll('#sum button').forEach(b=>b.onclick=()=>{filter=b.dataset.f||null;renderSum();renderQueue();});
+}
+function renderQueue(){
+  const rows = all().filter(a=>!filter||lvl(a)===filter).sort((a,b)=>a.date.localeCompare(b.date)||a.period.localeCompare(b.period));
+  const days={}; rows.forEach(a=>(days[a.date]=days[a.date]||[]).push(a));
+  $('#queue').innerHTML = Object.keys(days).map(d=>`<div class="day"><h3>${fmtDay(d)}</h3><div class="list">`+
+    days[d].map(a=>`<button class="row ${lvl(a)}" data-k="${esc(key(a))}" aria-current="${sel===key(a)}">
+      <span class="t">${a.period==='morning'?'เช้า':'บ่าย'}</span>
+      <span><span class="id">${esc(a.id)}</span> <span class="meta">${a.age} ปี · ${esc(a.proc)}</span></span>
+      <span><span class="pill"><i class="dot"></i>${LV[lvl(a)]} <b>${score(a)}</b></span>${S.outcome[key(a)]?`<span class="done-mark" ${S.outcome[key(a)]==='noshow'?'style="color:var(--hi)"':''}>${S.outcome[key(a)]==='came'?'มาตามนัด':'ขาดนัด'}</span>`:isDone(a)?'<span class="done-mark">ดำเนินการครบ</span>':''}</span></button>`).join('')+`</div></div>`).join('') || '<p class="note">ไม่มีนัดในกลุ่มนี้</p>';
+  document.querySelectorAll('.row').forEach(r=>r.onclick=()=>{sel=r.dataset.k;renderQueue();renderPanel();});
+}
+function renderPanel(){
+  const a = all().find(x=>key(x)===sel), P=$('#panel');
+  if(!a){P.className='panel';P.innerHTML='<h2>เลือกผู้ป่วยจากคิวนัด</h2><p class="note">ระบบจะแสดงเหตุผลที่เสี่ยงและมาตรการติดตามที่เหมาะกับระดับความเสี่ยง</p>';return;}
+  const L=lvl(a), na='ไม่มีข้อมูล', k=key(a);
+  P.className='panel '+L;
+  P.innerHTML = `
+    <div><h2><span style="font-family:var(--mono)">${esc(a.id)}</span> <span class="pill" style="margin-left:6px"><i class="dot"></i>${LV[L]}</span></h2>
+    <p class="note">${fmtDay(a.date)} · ${a.period==='morning'?'ช่วงเช้า':'ช่วงบ่าย'} · ${esc(a.proc)}</p></div>
+    <div><p class="sec">คะแนนความเสี่ยง</p><div class="gauge"><i style="width:${Math.min(100,score(a)*1.6)}%"></i></div>
+    <p class="note" style="margin-top:4px">${score(a)} / 100 · สูง ≥ ${S.cut.high} · ต่ำ &lt; ${S.cut.low}</p></div>
+    <dl class="kv"><div><dt>อายุ / เพศ</dt><dd>${a.age} ปี · ${a.sex==='F'?'หญิง':'ชาย'}</dd></div>
+      <div><dt>สถานภาพสมรส</dt><dd>${a.marital||na}</dd></div>
+      <div><dt>ที่พักอาศัย</dt><dd>${a.outArea===undefined?na:a.outArea?'นอกเขต รพ.สต.':'ในเขต รพ.สต.'}</dd></div>
+      <div><dt>สิทธิการรักษา</dt><dd>${a.scheme||na}</dd></div>
+      <div><dt>นัดล่วงหน้า</dt><dd>${a.lead===undefined?na:a.lead+' วัน'}</dd></div>
+      <div><dt>ประวัติขาดนัด</dt><dd>${a.priorNs===undefined?na:a.priorNs+' จาก '+a.prior+' นัด'}</dd></div></dl>
+    <div><p class="sec">ปัจจัยที่พบ</p>${(a.reasons&&a.reasons.length)?'<ul class="reasons">'+a.reasons.map(r=>`<li>${esc(r)}</li>`).join('')+'</ul>':'<p class="note">ไม่พบปัจจัยเสี่ยงเด่นหรือไม่มีข้อมูลเพิ่มเติม</p>'}</div>
+    <div><p class="sec">มาตรการที่แนะนำ</p>`+ACTIONS[L].map((t,i)=>`<div class="act"><input type="checkbox" id="a${i}" data-i="${i}" ${S.done[k+i]?'checked':''}><label for="a${i}">${t}</label></div>`).join('')+`</div>
+    <div><p class="sec">ผลการมารับบริการ (บันทึกหลังวันนัด)</p><div class="outc"><button data-o="came" aria-pressed="${S.outcome[k]==='came'}">มาตามนัด</button><button data-o="noshow" aria-pressed="${S.outcome[k]==='noshow'}">ขาดนัด</button></div></div>
+    <p class="note">ผลประเมินใช้เพื่อจัดลำดับการติดตามเท่านั้น ไม่ใช้ปฏิเสธหรือตัดสิทธิ์การรักษา</p>`;
+  P.querySelectorAll('input[type=checkbox]').forEach(c=>c.onchange=()=>{S.done[k+c.dataset.i]=c.checked;save();renderQueue();});
+  P.querySelectorAll('.outc button').forEach(b=>b.onclick=()=>{S.outcome[k]=S.outcome[k]===b.dataset.o?undefined:b.dataset.o;if(!S.outcome[k])delete S.outcome[k];save();renderQueue();renderPanel();});
+}
+
+// ---- นำเข้า (แอดมิน) ----
+const ID_RE=/^P?\d{3,6}$/i, DATE_RE=/^\d{4}-\d{2}-\d{2}$/;
+function mkAppt(r){
+  const id=String(r.id||'').trim(), date=String(r.date||'').trim();
+  if(!ID_RE.test(id)) return 'รหัสผู้ป่วยต้องเป็นรหัสวิจัย เช่น P0123 (ไม่รับชื่อหรือเลขบัตร)';
+  if(!DATE_RE.test(date)||isNaN(new Date(date))) return 'วันที่ต้องอยู่ในรูปแบบ ปปปป-ดด-วว (ค.ศ.)';
+  const sc=Number(r.score); if(!(sc>=0&&sc<=100)) return 'คะแนนความเสี่ยงต้องอยู่ระหว่าง 0–100';
+  if(!['morning','afternoon'].includes(r.period)) return 'ช่วงเวลาต้องเป็น morning หรือ afternoon';
+  const age=Math.round(Number(r.age)); if(!(age>=60&&age<=110)) return 'อายุต้องอยู่ระหว่าง 60–110 ปี';
+  const sex=String(r.sex).toUpperCase(); if(!['F','M'].includes(sex)) return 'เพศต้องเป็น F หรือ M';
+  const proc=String(r.proc||'').trim(); if(!proc) return 'ต้องระบุหัตถการ';
+  const idn=id.toUpperCase().startsWith('P')?id.toUpperCase():'P'+id.padStart(4,'0');
+  if(all().some(a=>a.id===idn&&a.date===date)) return 'มีนัดของรหัสนี้ในวันเดียวกันแล้ว';
+  return {id:idn,date,period:r.period,age,sex,proc,p:sc/100,reasons:[]};
+}
+function msg(el,html,cls){$(el).innerHTML=`<p class="msg ${cls}" role="status">${html}</p>`;}
+$('#f-date').value=D.appts[0]?D.appts[0].date:'';
+$('#f-add').onclick=()=>{
+  const r=mkAppt({id:$('#f-id').value,date:$('#f-date').value,period:$('#f-period').value,proc:$('#f-proc').value,age:$('#f-age').value,sex:$('#f-sex').value,score:$('#f-score').value});
+  if(typeof r==='string') return msg('#f-msg',esc(r),'err');
+  S.added.push(r);save();msg('#f-msg',`เพิ่ม ${esc(r.id)} เข้าคิวแล้ว (${LV[lvl(r)]})`,'ok');$('#f-id').value='';refresh();
+};
+function parseCSV(t){
+  const lines=t.replace(/^\uFEFF/,'').split(/\r?\n/).map(l=>l.trim()).filter(Boolean); if(lines.length<2) return {err:'ไม่พบข้อมูล ต้องมีบรรทัดหัวตารางและอย่างน้อย 1 แถว'};
+  const h=lines[0].split(',').map(x=>x.trim().toLowerCase()), need=['patient_id','appt_date','period','procedure','age','sex','risk_score'];
+  const miss=need.filter(n=>!h.includes(n)); if(miss.length) return {err:'ขาดคอลัมน์: '+miss.join(', ')};
+  return {rows:lines.slice(1).map(l=>{const c=l.split(',').map(x=>x.trim());const g=n=>c[h.indexOf(n)];return {id:g('patient_id'),date:g('appt_date'),period:g('period'),proc:g('procedure'),age:g('age'),sex:g('sex'),score:g('risk_score')};})};
+}
+$('#c-file').onchange=e=>{const f=e.target.files[0]; if(!f) return; const fr=new FileReader(); fr.onload=()=>{$('#c-text').value=fr.result;}; fr.readAsText(f);};
+$('#c-go').onclick=()=>{
+  const p=parseCSV($('#c-text').value); if(p.err) return msg('#c-msg',esc(p.err),'err');
+  let ok=0; const bad=[];
+  p.rows.forEach((r,i)=>{const a=mkAppt(r); if(typeof a==='string') bad.push(`แถว ${i+2}: ${a}`); else {S.added.push(a);ok++;}});
+  save(); refresh();
+  msg('#c-msg',`นำเข้าสำเร็จ ${ok} แถว${bad.length?` · ข้าม ${bad.length} แถว<br>`+bad.slice(0,5).map(esc).join('<br>')+(bad.length>5?'<br>…':''):''}`,bad.length&&!ok?'err':'ok');
+};
+$('#c-clear').onclick=()=>{S.added=[];save();refresh();msg('#c-msg','ล้างนัดที่นำเข้าแล้ว เหลือเฉพาะข้อมูลตัวอย่าง','ok');};
+
+// ---- ตั้งค่า/โมเดล (แอดมิน) ----
+function renderAdmin(){
+  $('#cut-high').value=S.cut.high; $('#cut-low').value=S.cut.low;
+  const c={high:0,medium:0,low:0}; all().forEach(a=>c[lvl(a)]++);
+  $('#cut-sum').innerHTML=['high','medium','low'].map(l=>`<div class="${l}"><i class="dot"></i>${LV[l]} ${c[l]} นัด</div>`).join('');
+  const o={high:[0,0],medium:[0,0],low:[0,0]}; all().forEach(a=>{const v=S.outcome[key(a)]; if(v){o[lvl(a)][0]++; if(v==='noshow')o[lvl(a)][1]++;}});
+  const tot=Object.values(o).reduce((s,x)=>s+x[0],0);
+  $('#outc-sum').innerHTML = tot? ['high','medium','low'].map(l=>`<div class="${l}"><div style="display:flex;justify-content:space-between"><span><i class="dot"></i>${LV[l]} · บันทึกแล้ว ${o[l][0]}</span><b style="font-family:var(--mono)">${o[l][0]?Math.round(o[l][1]/o[l][0]*100)+'%':'—'}</b></div></div>`).join('')+'<p class="note">ตัวเลขคืออัตราขาดนัดจริงจากที่บันทึก</p>' : '<p class="note">ยังไม่มีการบันทึกผล เจ้าหน้าที่บันทึกได้ในแผงรายละเอียดผู้ป่วย</p>';
+  const m=D.metrics,p=v=>v.toFixed(2);
+  $('#nsplit').textContent=`ฝึก ${D.n.train} นัด (ปี 2566–67) · ทดสอบ ${D.n.test} นัด (ปี 2568) · RF + SMOTE`;
+  $('#mets').innerHTML=[['AUC',m.auc],['PR-AUC',m.pr_auc],['Recall',m.recall],['Precision',m.precision],['F1',m.f1],['Accuracy',m.accuracy]].map(([k,v])=>`<div><div class="v">${p(v)}</div><div class="k">${k}</div></div>`).join('');
+  $('#risk3').innerHTML=['high','medium','low'].map(l=>{const r=D.risk[l];return `<div class="${l}"><div style="display:flex;justify-content:space-between;gap:8px"><span><i class="dot"></i>${LV[l]} · ${r.n} นัด</span><b style="font-family:var(--mono)">${(r.noshow_rate*100).toFixed(1)}%</b></div><div class="gauge" style="margin-top:4px"><i style="width:${Math.min(100,r.noshow_rate*100*2.5)}%"></i></div></div>`}).join('');
+  const NM={procedure:'ประเภทหัตถการ',sex:'เพศ',prior_noshows:'จำนวนครั้งที่เคยขาดนัด',prior_noshow_rate:'อัตราขาดนัดสะสม',marital:'สถานภาพสมรส',period:'ช่วงเวลานัด',age:'อายุ',out_area:'ที่พักนอกเขต',lead_days:'นัดล่วงหน้า (วัน)',scheme:'สิทธิการรักษา',dow:'วันในสัปดาห์',chronic_disease:'โรคเรื้อรัง'};
+  const GN={Predisposing:'ปัจจัยพื้นฐาน',Enabling:'ปัจจัยเอื้ออำนวย',Need:'ปัจจัยความจำเป็น'};
+  $('#legend').innerHTML=Object.keys(GN).map(g=>`<span style="--c:var(--${g==='Predisposing'?'accent':g==='Enabling'?'mid':'lo'})">${GN[g]}</span>`).join('');
+  const imp=[...D.imp].sort((a,b)=>b.pm-a.pm).slice(0,10), mp=Math.max(...imp.map(i=>Math.max(i.pm,0)),1e-9), mg=Math.max(...imp.map(i=>i.g));
+  $('#imp').innerHTML=imp.map(i=>`<div class="bar"><span>${NM[i.f]||i.f}</span><div><div class="track"><div class="fill g-${i.grp}" style="width:${Math.max(0,i.pm)/mp*100}%"></div></div><div class="track" style="margin-top:3px;height:8px;opacity:.55"><div class="fill g-${i.grp}" style="width:${i.g/mg*100}%"></div></div></div><span class="num">${i.pm.toFixed(3)}</span></div>`).join('');
+}
+function setCut(){const h=Math.round(Number($('#cut-high').value)),l=Math.round(Number($('#cut-low').value)); if(h>=1&&h<=100&&l>=0&&l<h){S.cut={low:l,high:h};save();refresh();}}
+$('#cut-high').onchange=setCut; $('#cut-low').onchange=setCut;
+$('#cut-reset').onclick=()=>{S.cut={...DEF_CUT};save();refresh();};
+
+function renderLine(){
+  const sl=$('#l-sel'), list=all().filter(a=>true).sort((a,b)=>a.date.localeCompare(b.date)||a.id.localeCompare(b.id));
+  const cur=sl.value; sl.innerHTML=list.map(a=>`<option value="${esc(key(a))}">${esc(a.id)} · ${a.date} · ${LV[lvl(a)]}</option>`).join('');
+  sl.value = list.some(a=>key(a)===cur)?cur:(sel&&list.some(a=>key(a)===sel)?sel:(list[0]?key(list[0]):''));
+  sl.onchange=renderLine;
+  const a=list.find(x=>key(x)===sl.value); if(!a){$('#l-body').innerHTML='';return;}
+  const L=lvl(a), slot=a.period==='morning'?'ช่วงเช้า':'ช่วงบ่าย', day=fmtDay(a.date);
+  const day_=all().filter(x=>x.date===a.date), c={high:0,medium:0,low:0}; day_.forEach(x=>c[lvl(x)]++);
+  const hi=day_.filter(x=>lvl(x)==='high').slice(0,5);
+  const box=(t,why,body)=>`<div class="chat"><h3>${t}</h3><p class="why">${why}</p>${body}</div>`;
+  const msg=(txt,btns)=>`<div class="bub">${esc(txt)}</div><div class="qr">${btns.map(b=>`<span>${b}</span>`).join('')}</div>`;
+  const pat=box('ผู้ป่วย','ส่งทุกระดับ 1–3 วันก่อนนัด',msg(`รพ.สต.บ้านเตาถ่าน แจ้งนัดทันตกรรม\n${day}\n${slot} · ${a.proc}\nกรุณามาตามนัด หากไม่สะดวกกดขอเลื่อนนัดได้`,['ยืนยันว่าจะมา','ขอเลื่อนนัด']));
+  const cg = L==='high' ? box('อสม. / ผู้ดูแล','เสี่ยงสูง ส่งก่อนนัด 2–3 วัน',msg(`ขอความร่วมมือเตือนและช่วยพาผู้ป่วยรหัส ${a.id} มารับบริการทันตกรรม\n${day} ${slot}\nหากเดินทางลำบาก แจ้ง รพ.สต. เพื่อประสานรถรับส่ง`,['รับทราบ','ต้องการรถรับส่ง']))
+    : L==='medium' ? box('อสม. / ผู้ดูแล','เสี่ยงปานกลาง ส่งก่อนนัด 2–3 วัน',msg(`ขอให้ช่วยยืนยันการเดินทางของผู้ป่วยรหัส ${a.id}\nนัดทันตกรรม ${day} ${slot}`,['ยืนยันแล้ว','ไม่สะดวก']))
+    : box('อสม. / ผู้ดูแล','เสี่ยงต่ำ ไม่ส่งข้อความถึงกลุ่มนี้','<div class="skip">นัดนี้ได้รับเฉพาะข้อความเตือนอัตโนมัติถึงผู้ป่วย</div>');
+  const st=box('เจ้าหน้าที่','สรุปเช้าวันก่อนนัด',msg(`สรุปนัดทันตกรรม ${day}\nทั้งหมด ${day_.length} นัด · สูง ${c.high} · กลาง ${c.medium} · ต่ำ ${c.low}\n`+(hi.length?'ต้องตามเป็นพิเศษ:\n'+hi.map(x=>`• ${x.id} ${x.proc} (${x.period==='morning'?'เช้า':'บ่าย'})`).join('\n'):'ไม่มีนัดเสี่ยงสูง'),['เปิดคิวนัด']));
+  $('#l-body').innerHTML=pat+cg+st;
+}
+function refresh(){renderSum();renderQueue();renderPanel();if(tab==='m')renderAdmin();if(tab==='l')renderLine();}
+renderTabs(); refresh();
+const first=all().find(a=>lvl(a)==='high'); if(first){sel=key(first);refresh();}
+</script>
+
+</body>
+</html>

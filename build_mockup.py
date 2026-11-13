@@ -1,4 +1,4 @@
-"""สร้าง docs/index.html (ภาพจำลองระบบ) จากผล train_model.py: นัดตัวอย่าง 1 สัปดาห์ของปี 2568"""
+"""สร้าง docs/mockup-v1.html (ภาพจำลองระบบ) จากผล train_model.py: นัดตัวอย่าง 1 สัปดาห์ของปี 2568"""
 import pandas as pd, json
 t = pd.read_csv("test_predictions.csv", parse_dates=["appt_date"]); res = json.load(open("results.json"))
 t["week"] = t.appt_date.dt.isocalendar().week
@@ -22,10 +22,10 @@ data = dict(appts=rows, cut=res["risk_cutoffs"], metrics=res["models"]["RF + SMO
 import os
 FACILITY = os.environ.get("FACILITY_NAME", "รพ.สต.บ้านเตาถ่าน")   # ชื่อหน่วยบริการในหน้าสาธิต
 html = open("mockup_template.html").read().replace("__DATA__", json.dumps(data, ensure_ascii=False)).replace("__FACILITY__", FACILITY)
-# docs/index.html เปิดตรงๆ (GitHub Pages) จึงต้องมี doctype/charset/viewport/กฎ [hidden] ครบ
+# docs/mockup-v1.html เปิดตรงๆ (GitHub Pages) จึงต้องมี doctype/charset/viewport/กฎ [hidden] ครบ
 i = html.index('<div class="wrap">')
 page = ('<!doctype html>\n<html lang="th">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">\n'
         + html[:i] + '<style>body{margin:0}[hidden]{display:none!important}img{max-width:100%}</style>\n</head>\n<body>\n' + html[i:] + '\n</body>\n</html>\n')
-open("docs/index.html", "w").write(page)
+open("docs/mockup-v1.html", "w").write(page)
 open("mockup_artifact.html", "w").write(html)   # แบบไม่มี skeleton สำหรับ Claude artifact
 print(len(rows), "appointments, week", w)
